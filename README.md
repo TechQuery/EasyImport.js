@@ -31,6 +31,7 @@ v0.6（单页稳定版）
 
 以下**示例代码**摘抄自上述网页的 HTML 源码 ——
 
+    <!-- lang: html -->
     <head>
     ......
     <script type="text/javascript" src="./Libs/EasyImport.js"></script>
