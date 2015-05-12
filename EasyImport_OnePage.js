@@ -2,7 +2,7 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v0.9  (2015-5-10)  Stable
+//      [Version]    v0.9  (2015-5-12)  Stable
 //
 //      [Usage]      Only for loading JavaScript files in Single-Page Web,
 //                   no Inherit support for Frames.
@@ -14,9 +14,10 @@
 
 self.onerror = function () {
     this.alert([
-        arguments[0],  "\n\n",
-        arguments[1],  ' in ',  arguments[2]
-    ].join(''));
+        arguments[0],
+        arguments[1],
+        'Line:  ' + arguments[2]
+    ].join("\n\n"));
 
     this.prompt('[Debug]', this.navigator.userAgent);
 
@@ -251,6 +252,11 @@ self.onerror = function () {
             root:       {
                 Document:    true,
                 Window:      true
+            },
+            button:     {
+                button:    true,
+                submit:    true,
+                reset:     true
             }
         },
         DOM_Event = [
@@ -331,7 +337,10 @@ self.onerror = function () {
     function _Operator_(iType, iElement, iName, iValue) {
         var iResult;
 
-        if (_Type_(iValue) == 'Undefined') {
+        if (! iName) {
+            for (var i = 0;  i < iElement.length;  i++)
+                _Get_Set_[iType].clear(iElement[i]);
+        } else if (_Type_(iValue) == 'Undefined') {
             if (_Type_(iName) == 'String')
                 return  _Get_Set_[iType].get(iElement[0], iName);
             else if (_Type_(iName.length) == 'Number') {
@@ -510,6 +519,7 @@ self.onerror = function () {
     /* ----- DOM Data ----- */
     _Get_Set_.Data = {
         _Data_:    [ ],
+        _Name_:    { },
         set:       function (iElement, iName, iValue) {
             if (_Type_(iElement.dataIndex) != 'Number')
                 iElement.dataIndex = this._Data_.push({ }) - 1;
@@ -527,6 +537,13 @@ self.onerror = function () {
             else  try {
                 return  _Operator_('Attribute', [iElement],  'data-' + iName);
             } catch (iError) { }
+        },
+        clear:     function (iElement) {
+            if (_Type_(iElement.dataIndex) == 'Number')
+                this._Data_[iElement.dataIndex] = null;
+        },
+        clone:     function (iOld, iNew) {
+            // ToDo
         }
     };
 
@@ -614,6 +631,8 @@ self.onerror = function () {
         });
     }
 
+    _Get_Set_.Data._Name_.event = true;
+
     function Event_Switch(iElement, iType, iCallback) {
         var Event_Data = _Operator_('Data', [iElement], 'event');
         if (! Event_Data)
@@ -650,6 +669,7 @@ self.onerror = function () {
     _Operator_('Data', [DOM], 'event', {
         ready:    [ ],
     });
+    _Get_Set_.Data._Name_.Ready_Timer = true;
 
     function DOM_Ready_Event() {
         if (DOM.isReady) return;
@@ -733,7 +753,7 @@ self.onerror = function () {
     }
 
 
-/* ----- HTTP Client ----- */
+/* ----- AJAX Module ----- */
     if (_Browser_.msie < 9)
         var IE_DOMParser = (function (MS_Version) {
                 for (var i = 0; i < MS_Version.length; i++)  try {
@@ -956,8 +976,11 @@ self.onerror = function () {
 
             return  iArgs.length ? _Args_ : null;
         },
-        data:             function () {
-            return  _Operator_('Data', [arguments[0]], arguments[1], arguments[2]);
+        data:             function (iElement, iName, iValue) {
+            if (iValue  &&  (iName in _Get_Set_.Data._Name_))
+                throw  'Name "' + iName + '" is only for Inner Using !';
+
+            return  _Operator_('Data', [iElement], iName, iValue);
         }
     });
 
@@ -1059,7 +1082,12 @@ self.onerror = function () {
             return this;
         },
         is:             function (iSelector) {
-            return  ($.inArray($(iSelector), this[0]) > -1);
+            return  (
+                    $.inArray(
+                        $(iSelector,  this[0] && this[0].parentNode),
+                        this[0]
+                    ) > -1
+                );
         },
         filter:         function (iSelector) {
             var $_This = this,
@@ -1186,6 +1214,21 @@ self.onerror = function () {
             var iResult = _Operator_('Style', this, arguments[0], arguments[1]);
             return  (typeof iResult == 'undefined') ? this : iResult;
         },
+        hide:           function () {
+            for (var i = 0, $_This;  i < this.length;  i++) {
+                $_This = $(this[i]);
+                $_This.data('display', $_This.css('display'))
+                    .css('display', 'none');
+            }
+            return this;
+        },
+        show:           function () {
+            for (var i = 0, $_This;  i < this.length;  i++) {
+                $_This = $(this[i]);
+                $_This.css('display',  $_This.data('display') || 'origin');
+            }
+            return this;
+        },
         width:          function () {
             switch ( $.type(this[0]) ) {
                 case 'Document':    return  Math.max(
@@ -1211,6 +1254,25 @@ self.onerror = function () {
                     );  break;
                 default:            return  this.css('height', arguments[0]);
             }
+        },
+        position:       function () {
+            return  {
+                    left:    this[0].offsetLeft,
+                    top:     this[0].offsetTop
+                };
+        },
+        offset:         function () {
+            var iOffset = {
+                    left:    this[0].offsetLeft,
+                    top:     this[0].offsetTop
+                };
+
+            Back_Track.call('offsetParent', function () {
+                iOffset.left += this.offsetLeft;
+                iOffset.top += this.offsetTop;
+            });
+
+            return iOffset;
         },
         addClass:       function (new_Class) {
             new_Class = new_Class.split(' ');
@@ -1312,17 +1374,19 @@ self.onerror = function () {
 
             return this;
         },
-        clone:          function () {
+        clone:          function (iDeep) {
             var $_This = this,  $_Result = [ ];
 
             for (var i = 0;  i < $_This.length;  i++)
-                $_Result.push( $_This[i].cloneNode(arguments[0]) );
+                $_Result.push( $_This[i].cloneNode(iDeep) );
 
             return  $.extend($($_Result), {prevObject:  $_This});
         },
         remove:         function () {
             for (var i = 0;  i < this.length;  i++)
                 this[i].parentNode.removeChild(this[i]);
+
+            _Operator_('Data', this);
 
             return this;
         },
@@ -1340,6 +1404,28 @@ self.onerror = function () {
                     $('*[iQuery="' + _UID_ + '"]'),
                     {prevObject:  $_This}
                 );
+        },
+        val:            function () {
+            if (! arguments[0])
+                return  this[0].value;
+            else
+                return  this.attr('value', arguments[0]);
+        },
+        serializeArray:    function () {
+            var $_Value = this.find('*[name]'),
+                iValue = [ ];
+
+            for (var i = 0;  i < $_Value.length;  i++)
+                if (
+                    (! $_Value[i].disabled) ||
+                    (! ($_Value[i].type in DOM_Type.button))
+                )
+                    iValue.push({
+                        name:     $_Value[i].name,
+                        value:    $_Value[i].value
+                    });
+
+            return iValue;
         }
     });
 
@@ -1907,10 +1993,11 @@ self.onerror = function () {
                 continue;
             }
             DOM_Head.append('script', {
-                type:        'text/javascript',
-                'class':     'EasyImport',
-                src:         iScript,
-                onload:      _Next_
+                type:       'text/javascript',
+                charset:    'UTF-8',
+                'class':    'EasyImport',
+                src:        iScript,
+                onload:     _Next_
             });
         }
     }
