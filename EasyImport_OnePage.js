@@ -1989,7 +1989,14 @@ self.onerror = function () {
 
 // ----------- Inner Basic Member ----------- //
     var UA = navigator.userAgent,
-        Root_Path,
+        Root_Path = (function ($_Script) {
+            for (var i = 0, iPath;  i < $_Script.length;  i++) {
+                iPath = $_Script[i].src.match(
+                    /(.+)[^\/]*EasyImport[^\/]*\.js[^\/]*$/i
+                );
+                if (iPath)  return iPath[1];
+            }
+        })( $('head > script') ),
         Load_Times = 0,
         $_Head = $('head').append('meta', {
             'http-equiv':    'Window-Target',
@@ -2156,13 +2163,8 @@ self.onerror = function () {
         var Func_Args = $.makeArray(arguments),
             JS_List,  CallBack;
 
-        Root_Path = Root_Path || (
-            (typeof Func_Args[0] == 'string') ?
-                Func_Args.shift() :
-                $('head > script')[0].src.replace(
-                    /[^\/]*EasyImport[^\/]*\.js[^\/]*$/i,  ''
-                )
-        );
+        Root_Path = (typeof Func_Args[0] == 'string') ?
+            Func_Args.shift() : Root_Path;
         if (Func_Args[0] instanceof Array)
             JS_List = Func_Args.shift();
         else
@@ -2174,26 +2176,47 @@ self.onerror = function () {
         var JS_Item = SL_Set(Root_Path, JS_List);
         if (CallBack)  JS_Item.push([CallBack]);
 
-        if ( JS_Item[0].length )
-            Load_Control(JS_Item, function () {
-                if (Load_Times > 1)  return;
+        if ( JS_Item[0].length ) {
+            if (Func_Args[0] != 'AMD')
+                Load_Control(JS_Item, function () {
+                    if (Load_Times > 1)  return;
 
-                var Async_Time = $.end('DOM_Ready'),
-                    Sync_Time = $(DOM).data('Load_During');
-                $('head > script.EasyImport').each(function () {
-                    Sync_Time += $(this).data('Load_During');
+                    var Async_Time = $.end('DOM_Ready'),
+                        Sync_Time = $(DOM).data('Load_During');
+                    $('head > script.EasyImport').each(function () {
+                        Sync_Time += $(this).data('Load_During');
+                    });
+                    console.info([
+                        '[ EasyImport.js ]  Time Statistics',
+                        '  Async Sum:    ' + Async_Time.toFixed(3) + ' s',
+                        '  Sync Sum:     ' + Sync_Time.toFixed(3) + ' s',
+                        '  Saving:       ' + (
+                            ((Sync_Time - Async_Time) / Sync_Time) * 100
+                        ).toFixed(2) + ' %'
+                    ].join("\n\n"));
+
+                    BOM.iShadowCover.close();
                 });
-                console.info([
-                    '[ EasyImport.js ]  Time Statistics',
-                    '  Async Sum:    ' + Async_Time.toFixed(3) + ' s',
-                    '  Sync Sum:     ' + Sync_Time.toFixed(3) + ' s',
-                    '  Saving:       ' + (
-                        ((Sync_Time - Async_Time) / Sync_Time) * 100
-                    ).toFixed(2) + ' %'
-                ].join("\n\n"));
+        }
+    };
 
-                BOM.iShadowCover.close();
-            });
+
+/* ---------- AMD Support ---------- */
+    $_Head.data('AMD',  { });
+
+    BOM.define = function () {
+        var _Args_ = $.makeArray(arguments),
+            _Module_ = $_Head.data('AMD'),
+            iModule = { };
+
+        iModule.name = (typeof _Args_[0] == 'string')  ?  _Args_.shift()  :
+            $('head > script.EasyImport').slice(-1)[0].src.match(/^[^\?]*?\/?([^\/\?]+)(\?.+)?$/)[1];
+        iModule.dependence = (_Args_[0] instanceof Array)  ?  _Args_.shift()  :  [ ];
+        iModule.body = _Args_[0];
+
+        if (! _Module_[iModule.name])
+            _Module_[iModule.name] = [ ];
+        _Module_[iModule.name].push(iModule);
     };
 
 })(self, self.document, self.iQuery);
