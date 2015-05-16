@@ -45,11 +45,14 @@ self.onerror = function () {
 /* ---------- ECMAScript 5  Patch ---------- */
 (function (BOM) {
 
-    BOM.iRegExp = function (iString, Special_Char, Mode) {
-        var iChar = ['/', '.'];
+    BOM.iRegExp = function (iString, Mode, Special_Char) {
+        var iRegExp_Compiled = / /,
+            iChar = ['/', '.'];
+
         if (Special_Char instanceof Array)
             iChar = iChar.concat(Special_Char);
-        var iRegExp_Compiled = / /;
+        else if (Special_Char === null)
+            iChar.length = 0;
 
         for (var i = 0; i < iChar.length; i++)
             iString = iString.replace(
@@ -1367,7 +1370,7 @@ self.onerror = function () {
             return this;
         },
         removeClass:    function (iClass) {
-            iClass = / /.compile(
+            iClass = BOM.iRegExp(
                 '\s+(' + iClass.replace(/\s+/g, '|') + ')\s+',  'g'
             );
 
@@ -1989,7 +1992,9 @@ self.onerror = function () {
 
 // ----------- Inner Basic Member ----------- //
     var UA = navigator.userAgent,
-        Root_Path = (function ($_Script) {
+        RE_FileName = BOM.iRegExp('^[^\\?]*?\\/?([^\\/\\?]+)(\\?.+)?$', undefined, null);
+
+    var Root_Path = (function ($_Script) {
             for (var i = 0, iPath;  i < $_Script.length;  i++) {
                 iPath = $_Script[i].src.match(
                     /(.+)[^\/]*EasyImport[^\/]*\.js[^\/]*$/i
@@ -1997,12 +2002,15 @@ self.onerror = function () {
                 if (iPath)  return iPath[1];
             }
         })( $('head > script') ),
-        Load_Times = 0,
-        $_Head = $('head').append('meta', {
+        Load_Times = 0;
+
+    var $_Head = $('head').append('meta', {
             'http-equiv':    'Window-Target',
             content:         '_top'
         }),
         $_Title = $('head title');
+
+    var Last_Loaded = $.now();
 
 // ----------- Standard Mode Meta Patches ----------- //
     if ($.browser.mobile) {
@@ -2053,12 +2061,15 @@ self.onerror = function () {
     iQueue.prototype.push = [ ].push;
     iQueue.prototype.shift = [ ].shift;
     iQueue.prototype.splice = [ ].splice;
+    iQueue.prototype.slice = [ ].slice;
     iQueue.prototype.newGroup = function () {
-        var _Length_ = this.length;
+        var _Length_;
 
-        if ((! this.length) || this[_Length_ - 1].length) {
-            _Length_ = this.push([ ]);
-            this.lastGroup = this[_Length_ - 1];
+        if ((! this.length) || this.slice(-1)[0].length) {
+            _Length_ = this.push($.extend([ ],  {
+                loaded:    0
+            }));
+            this.lastGroup = this.slice(-1)[0];
         }
         return _Length_;
     };
@@ -2097,7 +2108,7 @@ self.onerror = function () {
         return List1;
     }
 
-    function Load_Control(iOrder, iFinal) {
+    function DOM_Load(iOrder, iFinal) {
         if (! iOrder[0]) {
             iFinal();
             return;
@@ -2143,6 +2154,80 @@ self.onerror = function () {
         }
     }
 
+    function AMD_Load(iOrder, iFinal) {
+        function _Next_() {
+            var _Module_ = $_Head.data('AMD'),
+                iModule,
+                iName = this.src.match(RE_FileName)[1];
+
+            iModule = _Module_[iName];
+            if (! iModule) {
+                _Module_[iName] = $.extend([ ], _Module_[Last_Loaded]);
+                delete _Module_[Last_Loaded];
+                $_Head.data('AMD', _Module_);
+            }
+
+            for (var i = 0;  i < iOrder.length;  i++)
+                if (iOrder[i].loaded != iOrder[i].length) {
+                    for (var j = 0;  j < iOrder[i].length;  j++) {
+                        iModule = _Module_[ iOrder[i][j].match(RE_FileName)[1] ];
+                        if (! iModule)  continue;
+
+                        for (var k = 0;  k < iModule.length;  k++)
+                            iModule[k].body.apply(this, iModule[k].dependence);
+
+                        iOrder[i].loaded++ ;
+                    }
+                    break;
+                }
+        }
+
+        $.each(iOrder,  function (i) {
+            var This_Call = arguments;
+
+            if ((i + 1) == iOrder.length) {
+                $(DOM).ready(function () {
+                    This_Call.callee.call(iOrder[i], ++i);
+                    iFinal();
+                });
+                return;
+            }
+
+            for (var j = 0;  j < this.length;  j++) {
+                if (typeof this[j] != 'function')
+                    $_Head.append('script', {
+                        type:       'text/javascript',
+                        charset:    'UTF-8',
+                        'class':    'EasyImport',
+                        src:        this[j],
+                        onload:     _Next_
+                    });
+                else
+                    this[j]();
+            }
+        });
+    }
+
+    function Load_End() {
+        if (Load_Times > 1)  return;
+
+        var Async_Time = $.end('DOM_Ready'),
+            Sync_Time = $(DOM).data('Load_During');
+        $('head > script.EasyImport').each(function () {
+            Sync_Time += $(this).data('Load_During');
+        });
+        console.info([
+            '[ EasyImport.js ]  Time Statistics',
+            '  Async Sum:    ' + Async_Time.toFixed(3) + ' s',
+            '  Sync Sum:     ' + Sync_Time.toFixed(3) + ' s',
+            '  Saving:       ' + (
+                ((Sync_Time - Async_Time) / Sync_Time) * 100
+            ).toFixed(2) + ' %'
+        ].join("\n\n"));
+
+        BOM.iShadowCover.close();
+    }
+
     $.cssRule({
         '#iSC': {
             background:    'darkgray'
@@ -2176,28 +2261,12 @@ self.onerror = function () {
         var JS_Item = SL_Set(Root_Path, JS_List);
         if (CallBack)  JS_Item.push([CallBack]);
 
-        if ( JS_Item[0].length ) {
-            if (Func_Args[0] != 'AMD')
-                Load_Control(JS_Item, function () {
-                    if (Load_Times > 1)  return;
+        if (! JS_Item[0].length)  return;
 
-                    var Async_Time = $.end('DOM_Ready'),
-                        Sync_Time = $(DOM).data('Load_During');
-                    $('head > script.EasyImport').each(function () {
-                        Sync_Time += $(this).data('Load_During');
-                    });
-                    console.info([
-                        '[ EasyImport.js ]  Time Statistics',
-                        '  Async Sum:    ' + Async_Time.toFixed(3) + ' s',
-                        '  Sync Sum:     ' + Sync_Time.toFixed(3) + ' s',
-                        '  Saving:       ' + (
-                            ((Sync_Time - Async_Time) / Sync_Time) * 100
-                        ).toFixed(2) + ' %'
-                    ].join("\n\n"));
-
-                    BOM.iShadowCover.close();
-                });
-        }
+        if (Func_Args[0] != 'AMD')
+            DOM_Load(JS_Item, Load_End);
+        else
+            AMD_Load(JS_Item, Load_End);
     };
 
 
@@ -2209,8 +2278,7 @@ self.onerror = function () {
             _Module_ = $_Head.data('AMD'),
             iModule = { };
 
-        iModule.name = (typeof _Args_[0] == 'string')  ?  _Args_.shift()  :
-            $('head > script.EasyImport').slice(-1)[0].src.match(/^[^\?]*?\/?([^\/\?]+)(\?.+)?$/)[1];
+        iModule.name = (typeof _Args_[0] == 'string') ? _Args_.shift() : Last_Loaded;
         iModule.dependence = (_Args_[0] instanceof Array)  ?  _Args_.shift()  :  [ ];
         iModule.body = _Args_[0];
 
@@ -2218,5 +2286,7 @@ self.onerror = function () {
             _Module_[iModule.name] = [ ];
         _Module_[iModule.name].push(iModule);
     };
+
+    BOM.define.amd = '';
 
 })(self, self.document, self.iQuery);
