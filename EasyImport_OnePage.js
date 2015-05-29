@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-5-18)  Stable
+//      [Version]    v1.0  (2015-5-27)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -82,6 +82,11 @@ self.onerror = function () {
                     return i;
 
             return -1;
+        };
+
+    if (! Date.now)
+        Date.now = function () {
+            return  (new Date()).getTime();
         };
 
     if ( BOM.navigator.userAgent.match(/; rv:(\d+)[^\/]+Gecko\/\d+/) )
@@ -180,13 +185,23 @@ self.onerror = function () {
         return JSON_ValueIn(iJSON[0], iJSON[1]);
     };
 
+    BOM.JSON.parseAll = function (iJSON) {
+        return  this.parse(iJSON,  function (iKey, iValue) {
+                if (iKey && (typeof iValue == 'string'))  try {
+                    return  BOM.JSON.parse(iValue);
+                } catch (iError) { }
+
+                return iValue;
+            });
+    };
+
     BOM.new_Window_Fix = function (Fix_More) {
         if (! this)  return false;
 
-        var _Window_ = this.opener,
-            This_DOM = this.document;
-
         try {
+            var _Window_ = this.opener,
+                This_DOM = this.document;
+
             if (_Window_ && (this.location.href == 'about:blank'))
                 This_DOM.domain = _Window_.document.domain;
 
@@ -197,6 +212,7 @@ self.onerror = function () {
         }
         if (Fix_More)
             Fix_More.call(this);
+
         return true;
     };
 
@@ -237,12 +253,15 @@ self.onerror = function () {
 
 
 /* ----- Object Base ----- */
-    function _Extend_(iTarget, iSource) {
-        iTarget = iTarget || { };
+    function _Extend_(iTarget) {
+        iTarget = iTarget || (
+            (arguments[1] instanceof Array)  ?  [ ]  :  { }
+        );
 
-        for (var iKey in iSource)
-            if ( Object.prototype.hasOwnProperty.call(iSource, iKey) )
-                iTarget[iKey] = iSource[iKey];
+        for (var i = 1;  i < arguments.length;  i++)
+            for (var iKey in arguments[i])
+                if ( Object.prototype.hasOwnProperty.call(arguments[i], iKey) )
+                    iTarget[iKey] = arguments[i][iKey];
 
         return iTarget;
     }
@@ -431,7 +450,8 @@ self.onerror = function () {
             left:               true
         },
         get:          function (iElement, iName) {
-            if (_Type_(iElement) in Type_Info.DOM.root)  return null;
+            if ((! iElement) || (_Type_(iElement) in Type_Info.DOM.root))
+                return null;
 
             var iScale = 1;
 
@@ -616,53 +636,12 @@ self.onerror = function () {
             }
         };
 
-    var _Event_ = _Browser_.modern ? {
-            bind:    function () {
-                arguments[0].addEventListener(arguments[1], arguments[2], false);
-            },
-            trig:    function () {
-                var iEvent = DOM.createEvent('HTMLEvents');
-                iEvent.initEvent(arguments[1], true, true);
-                arguments[0].dispatchEvent(iEvent);
-            }
-        } : {
-            bind:    function (iElement, iType, iCallback) {
-                var This_DOM = (_Type_(iElement) == 'Document') ?
-                        iElement : (iElement.ownerDocument || iElement.document);
+    /* ----- W3C Event Method Wrapper ----- */
+    if (! _Browser_.modern) {
+        _Get_Set_.Data._Name_.event_ie = true;
 
-                //  Custom DOM Event
-                if (Type_Info.DOM_Event.indexOf(iType) == -1) {
-                    if (! _Operator_('Data', [iElement], 'custom-event')) {
-                        _Operator_('Data', [iElement], 'custom-event', true);
-                        iType = 'propertychange';
-                    } else  iType = '';
-
-                    if (! _Operator_('Attribute',  [iElement],  'on' + iType))
-                        _Operator_('Attribute',  [iElement],  'on' + iType,  _Time_.now());
-                }
-
-                //  Patch to W3C DOM Event
-                if (iType == 'DOMContentLoaded') {
-                    if (BOM !== BOM.top)  iType = 'load';
-                    else {
-                        _Time_.every(0.01, function () {
-                            try {
-                                This_DOM.documentElement.doScroll('left');
-                                iCallback.call(This_DOM, BOM.event);
-                                return false;
-                            } catch (Err) {
-                                return;
-                            }
-                        });
-                        return iElement;
-                    }
-                }
-                if ((_Type_(iElement) != 'Window') && (iType == 'load'))
-                    iType = 'readystatechange';
-
-                if (! iType)  return;
-
-                iElement.attachEvent('on' + iType, function () {
+        function IE_Event_Handler(iElement, iCallback) {
+            return  function () {
                     var iEvent = _Extend_(
                             new (function HTMLEvent () {})(),
                             BOM.event
@@ -693,9 +672,74 @@ self.onerror = function () {
                             mouseleave:    iEvent.toElement || iEvent.fromElement
                         })[iEvent.type]
                     }));
-                });
+                };
+        }
+    }
+
+    var _Event_ = _Browser_.modern ? {
+            bind:      function (iElement, iType, iCallback) {
+                iElement.addEventListener(iType, iCallback, false);
             },
-            trig:    function (iElement, iType) {
+            unbind:    function (iElement, iType, iCallback) {
+                iElement.removeEventListener(iType, iCallback, false);
+            },
+            trig:      function () {
+                var iEvent = DOM.createEvent('HTMLEvents');
+                iEvent.initEvent(arguments[1], true, true);
+                arguments[0].dispatchEvent(iEvent);
+            }
+        } : {
+            bind:      function (iElement, iType, iCallback) {
+                var This_DOM = (_Type_(iElement) == 'Document') ?
+                        iElement : (iElement.ownerDocument || iElement.document);
+
+                //  Custom DOM Event
+                if (Type_Info.DOM_Event.indexOf(iType) == -1) {
+                    if (! _Operator_('Data', [iElement], 'custom-event')) {
+                        _Operator_('Data', [iElement], 'custom-event', true);
+                        iType = 'propertychange';
+                    } else  iType = '';
+
+                    if (! _Operator_('Attribute',  [iElement],  'on' + iType))
+                        _Operator_('Attribute',  [iElement],  'on' + iType,  _Time_.now());
+                }
+
+                //  Patch to W3C DOM Event
+                if (iCallback && (iType == 'DOMContentLoaded')) {
+                    if (BOM !== BOM.top)  iType = 'load';
+                    else {
+                        _Time_.every(0.01, function () {
+                            try {
+                                This_DOM.documentElement.doScroll('left');
+                                iCallback.call(This_DOM, BOM.event);
+                                return false;
+                            } catch (Err) {
+                                return;
+                            }
+                        });
+                        return;
+                    }
+                }
+                if ((_Type_(iElement) != 'Window') && (iType == 'load'))
+                    iType = 'readystatechange';
+
+                if (! iType)  return;
+
+                //  Event Handler Patch
+                var _Handler_ = _Operator_('Data', [iElement], 'event_ie');
+
+                if (! _Handler_) {
+                    _Handler_ = IE_Event_Handler(iElement, iCallback);
+                    _Operator_('Data', [iElement], 'event_ie', _Handler_);
+                }
+                iElement[
+                    (iCallback ? 'at' : 'de') + 'tachEvent'
+                ]('on' + iType,  _Handler_);
+            },
+            unbind:    function () {
+                this.bind(arguments[0], arguments[1]);
+            },
+            trig:      function (iElement, iType) {
                 iType = iType.toLowerCase();
 
                 if (Type_Info.DOM_Event.indexOf(iType) > -1) {
@@ -707,7 +751,21 @@ self.onerror = function () {
             }
         };
 
+    /* ----- Event Proxy Layer ----- */
     _Get_Set_.Data._Name_.event = true;
+
+    function Proxy_Handler(iEvent) {
+        var iHandler = _Operator_('Data', [this], 'event')[iEvent.type],
+            iReturn;
+
+        for (var i = 0, _Return_;  i < iHandler.length;  i++) {
+            _Return_ = iHandler[i].apply(this, arguments);
+            if (typeof _Return_ == 'undefined')
+                iReturn = _Return_;
+        }
+
+        return iReturn;
+    }
 
     function Event_Switch(iElement, iType, iCallback) {
         if (iType.indexOf('DOM') != 0)
@@ -719,24 +777,15 @@ self.onerror = function () {
 
         if (! Event_Data[iType]) {
             Event_Data[iType] = [ ];
-            _Event_.bind(iElement, iType, function (iEvent) {
-                var iHandler = _Operator_('Data', [iElement], 'event')[iEvent.type],
-                    iReturn;
-
-                for (var i = 0, _Return_;  i < iHandler.length;  i++) {
-                    _Return_ = iHandler[i].apply(this, arguments);
-                    if (typeof _Return_ == 'undefined')
-                        iReturn = _Return_;
-                }
-
-                return iReturn;
-            });
+            _Event_.bind(iElement, iType, Proxy_Handler);
         }
 
         if (iCallback)
             Event_Data[iType].push( iCallback );
-        else
+        else {
             Event_Data[iType] = null;
+            _Event_.unbind(iElement, iType, Proxy_Handler);
+        }
 
         _Operator_('Data', [iElement], 'event', Event_Data);
     }
@@ -918,7 +967,7 @@ self.onerror = function () {
                     var iResponse = this.responseText.trim();
 
                     try {
-                        iResponse = BOM.JSON.parse(iResponse);
+                        iResponse = BOM.JSON.parseAll(iResponse);
                     } catch (iError) {
                         try {
                             iResponse = XML_Parse(iResponse);
@@ -1078,31 +1127,31 @@ self.onerror = function () {
     
     /* ----- HTTP Client ----- */
     function iHTTP(iURL, iData, iCallback) {
-        iURL = iURL.split('?')[0] + '?' + $.param(
-            $.extend($.paramJSON(iURL), {_:  $.now()})
-        );
-
         var HTTP_Client = iAJAX(
                 arguments,
                 iCallback.name || X_Domain(iURL)
             );
         HTTP_Client.onready = iCallback;
         HTTP_Client.open(iData ? 'POST' : 'GET', iURL, true);
+        if (iData)
+            HTTP_Client.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 //        HTTP_Client.setRequestHeader('If-Modified-Since', 0);
         HTTP_Client.send(
-            (typeof iData == 'string') ? iData : BOM.JSON.stringify(JSON)
+            (typeof iData == 'string') ?
+                iData : BOM.encodeURI( $.param(iData || { }) )
         );
 
         return HTTP_Client;
     }
 
     _Extend_($, {
-        get:     function () {
-            return  iHTTP(arguments[0], null, arguments[1]);
+        get:     function (iURL, iData, iCallback) {
+            iURL = iURL.split('?')[0] + '?' + $.param(
+                $.extend($.paramJSON(iURL),  iData,  {_:  $.now()})
+            );
+            return  iHTTP(iURL, null, iCallback);
         },
-        post:    function () {
-            return  iHTTP(arguments[0], arguments[1], arguments[2]);
-        }
+        post:    iHTTP
     });
 
     /* ----- iQuery Instance Method ----- */
@@ -1282,7 +1331,7 @@ self.onerror = function () {
             var $_This = this,  $_Result = [ ];
 
             for (var i = 0;  i < $_This.length;  i++)
-                $_Result = $_Result.concat( $(arguments[0], $_This[i]) );
+                $_Result = [ ].concat.apply($_Result, $(arguments[0], $_This[i]));
 
             return  $.extend($($_Result), {prevObject:  $_This});
         },
@@ -1495,6 +1544,14 @@ self.onerror = function () {
                 this[i].parentNode.removeChild(this[i]);
 
             _Operator_('Data', this);
+
+            return this;
+        },
+        empty:          function () {
+            var iChild = this.children().remove();
+
+            for (var i = 0;  i < iChild.length;  i++)
+                iChild[i].innerHTML = '';
 
             return this;
         },
@@ -1818,38 +1875,38 @@ self.onerror = function () {
 
 
 
-/* ----- 模态框/遮罩层（全局） v0.2 ----- */
+/* ----- 模态框/遮罩层（全局） v0.3 ----- */
 (function (BOM, DOM, $) {
 
     BOM.iShadowCover = {
-        DOM:      $('<div id="iSC"><div /></div>')[0],
+        $_DOM:      $('<div id="iSC"><div /></div>'),
         open:     function (iContent, closeCB) {
             this.locked = ($.type(iContent) == 'Window');
 
             if (! this.locked)
-                $(this.DOM.firstChild).append(iContent);
+                $(this.$_DOM[0].firstChild).append(iContent);
             else
                 this.Content = iContent;
 
-            this.DOM.style.height = BOM.innerHeight || DOM.body.clientHeight;
-            this.DOM.style.display = 'table';
+            this.$_DOM.height( $(BOM).height() ).css('display', 'table');
             this.closed = false;
             this.onclose = closeCB;
 
             return iContent;
         },
         close:    function () {
-            this.DOM.style.display = 'none';
-            this.DOM.firstChild.innerHTML = '';
+            this.$_DOM.hide().attr('class', '');
+            $(this.$_DOM[0].firstChild).empty();
             this.closed = true;
             if (this.onclose)
-                this.onclose.call(this.DOM);
+                this.onclose.call(this.$_DOM[0]);
         }
     };
 
     $(DOM).ready(function () {
-        $(this.body.firstElementChild || this.body.firstChild).before(BOM.iShadowCover.DOM);
-    }).bind('keydown', function () {
+        $(this.body.firstElementChild || this.body.firstChild)
+            .before(BOM.iShadowCover.$_DOM);
+    }).keydown(function () {
         if (BOM.iShadowCover.closed) return;
 
         if (! BOM.iShadowCover.locked) {
@@ -1859,7 +1916,7 @@ self.onerror = function () {
             BOM.iShadowCover.Content.focus();
     });
 
-    $(BOM.iShadowCover.DOM).bind('click', function () {
+    BOM.iShadowCover.$_DOM.click(function () {
         if (! BOM.iShadowCover.locked) {
             if (arguments[0].target.parentNode === this)
                 BOM.iShadowCover.close();
@@ -1906,7 +1963,7 @@ self.onerror = function () {
                 .add('<base target="_self" />')
                 .appendTo(this.document.head);
 
-            $(this.document).bind('keydown', function (iEvent) {
+            $(this.document).keydown(function (iEvent) {
                 var iKeyCode = iEvent.which;
 
                 if (
@@ -1919,7 +1976,7 @@ self.onerror = function () {
                     return false;
             }).bind('contextmenu', function () {
                 return false;
-            }).bind('mousedown', function () {
+            }).mousedown(function () {
                 if (arguments[0].which == 3)
                     return false;
             });
@@ -1993,7 +2050,7 @@ self.onerror = function () {
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v0.9  (2015-5-15)  Stable
+//      [Version]    v0.9  (2015-5-22)  Stable
 //
 //      [Usage]      Only for loading JavaScript files in Single-Page Web,
 //                   no Inherit support for Frames.
@@ -2005,7 +2062,7 @@ self.onerror = function () {
 
 (function (BOM, DOM, $) {
 
-// ----------- Inner Basic Member ----------- //
+/* ----------- Basic Data ----------- */
     var UA = navigator.userAgent,
         RE_FileName = BOM.iRegExp('^[^\\?]*?\\/?([^\\/\\?]+)(\\?.+)?$', undefined, null);
 
@@ -2025,7 +2082,9 @@ self.onerror = function () {
         }),
         $_Title = $('head title');
 
-// ----------- Standard Mode Meta Patches ----------- //
+
+
+/* ----------- Standard Mode Meta Patches ----------- */
     if ($.browser.mobile) {
         if ($.browser.modern) {
             var is_WeChat = UA.match(/MicroMessenger/i),
@@ -2060,7 +2119,8 @@ self.onerror = function () {
             content:         'IE=Edge, Chrome=1'
         });
 
-// ----------- Inner Logic Module ----------- //
+
+/* ---------- Loading Queue ---------- */
     var UA_Rule = {
             old_PC:    ! $.browser.modern,
             Mobile:    $.browser.mobile,
@@ -2071,54 +2131,60 @@ self.onerror = function () {
     function iQueue() {
         this.length = 0;
     }
-    iQueue.prototype.push = [ ].push;
-    iQueue.prototype.shift = [ ].shift;
-    iQueue.prototype.splice = [ ].splice;
-    iQueue.prototype.slice = [ ].slice;
-    iQueue.prototype.newGroup = function () {
-        var _Length_;
+    $.extend(iQueue.prototype, {
+        push:        [ ].push,
+        shift:       [ ].shift,
+        splice:      [ ].splice,
+        slice:       [ ].slice,
+        newGroup:    function () {
+            var _Length_;
 
-        if ((! this.length) || this.slice(-1)[0].length) {
-            _Length_ = this.push([ ]);
-            this.lastGroup = this.slice(-1)[0];
+            if ((! this.length) || this.slice(-1)[0].length) {
+                _Length_ = this.push($.extend([ ],  {
+                    loaded:    0
+                }));
+                this.lastGroup = this.slice(-1)[0];
+            }
+            return _Length_;
+        },
+        add:         function (iFileName) {
+            if (! iFileName.match(/^http(s)?:\/\//))
+                iFileName = Root_Path + iFileName;
+            this[this.length - 1].push( iFileName );
         }
-        return _Length_;
-    };
-    iQueue.prototype.add = function (iFileName) {
-        if (! iFileName.match(/^http(s)?:\/\//))
-            iFileName = Root_Path + iFileName;
-        this[this.length - 1].push( iFileName );
-    };
+    });
 
-    function SL_Set(RP, List0) {
-        for (var i = 0; i < List0.length; i++)
-            if (! (List0[i] instanceof Array))
-                List0[i] = [List0[i]];
+    function Make_Queue(iList) {
+        for (var i = 0; i < iList.length; i++)
+            if (! (iList[i] instanceof Array))
+                iList[i] = [iList[i]];
 
-        var List1 = new iQueue();
-        for (var i = 0; i < List0.length; i++) {
-            List1.newGroup();
-            for (var j = 0, _Item_; j < List0[i].length; j++) {
-                _Item_ = List0[i][j];
+        var _Queue_ = new iQueue();
+        for (var i = 0; i < iList.length; i++) {
+            _Queue_.newGroup();
+            for (var j = 0, _Item_; j < iList[i].length; j++) {
+                _Item_ = iList[i][j];
                 if (typeof _Item_ == 'string')
-                    List1.add(_Item_);
+                    _Queue_.add(_Item_);
                 else {
                     var no_Break = true;
                     for (RI in UA_Rule)  if (UA_Rule[RI]) {
                         if (_Item_[RI] === false)
                             no_Break = false;
                         else if (_Item_[RI])
-                            List1.add(_Item_[RI]);
+                            _Queue_.add(_Item_[RI]);
                         break;
                     }
                 }
-                if (no_Break && (! List1.lastGroup[j]) && _Item_.new_PC)
-                    List1.add(_Item_.new_PC);
+                if (no_Break && (! _Queue_.lastGroup[j]) && _Item_.new_PC)
+                    _Queue_.add(_Item_.new_PC);
             }
         }
-        return List1;
+        return _Queue_;
     }
 
+
+/* ---------- DOM Load-Engine ---------- */
     function DOM_Load(iOrder, iFinal) {
         if (! iOrder[0]) {
             iFinal();
@@ -2140,7 +2206,7 @@ self.onerror = function () {
             if ( iOrder[0][++This_Group] )  return;
 
             $(this).data('Load_During', $.end(
-                this.src.split('/').slice(-1)[0]
+                this.src.match(RE_FileName)[1]
             ));
             iOrder.shift();
             This_Call.callee.apply(this, This_Call);
@@ -2161,24 +2227,46 @@ self.onerror = function () {
                 src:        iScript,
                 onload:     _Next_
             });
-            $.start( iScript.split('/').slice(-1)[0] );
+            $.start( iScript.match(RE_FileName)[1] );
         }
     }
 
+// ----------- Open API ----------- //
     $.cssRule({
-        '#iSC': {
+        '#iSC.EasyImport': {
             background:    'darkgray'
         },
-        '#iSC h1': {
+        '#iSC.EasyImport h1': {
             color:    'white'
         }
     });
     $(DOM).ready(function () {
+        $('#iSC').addClass('EasyImport');
         BOM.showModalDialog($('<h1>Loading...</h1>'), 1);
     });
 
 
-// ----------- Open API ----------- //
+    function Load_End() {
+        if ( Load_Times++ )  return;
+
+        var Async_Time = $.end('DOM_Ready'),
+            Sync_Time = $(DOM).data('Load_During');
+        $('head > script.EasyImport').each(function () {
+            Sync_Time += $(this).data('Load_During');
+        });
+        console.info([
+            '[ EasyImport.js ]  Time Statistics',
+            '  Async Sum:    ' + Async_Time.toFixed(3) + ' s',
+            '  Sync Sum:     ' + Sync_Time.toFixed(3) + ' s',
+            '  Saving:       ' + (
+                ((Sync_Time - Async_Time) / Sync_Time) * 100
+            ).toFixed(2) + ' %'
+        ].join("\n\n"));
+
+        BOM.iShadowCover.close();
+    }
+
+
     BOM.ImportJS = function () {
         var Func_Args = $.makeArray(arguments),
             JS_List,  CallBack;
@@ -2193,29 +2281,12 @@ self.onerror = function () {
             Func_Args.shift() : null;
 
 
-        var JS_Item = SL_Set(Root_Path, JS_List);
+        var JS_Item = Make_Queue(JS_List);
         if (CallBack)  JS_Item.push([CallBack]);
 
-        if ( JS_Item[0].length )
-            DOM_Load(JS_Item, function Load_End() {
-                if ( Load_Times++ )  return;
+        if (! JS_Item[0].length)  return;
 
-                var Async_Time = $.end('DOM_Ready'),
-                    Sync_Time = $(DOM).data('Load_During');
-                $('head > script.EasyImport').each(function () {
-                    Sync_Time += $(this).data('Load_During');
-                });
-                console.info([
-                    '[ EasyImport.js ]  Time Statistics',
-                    '  Async Sum:    ' + Async_Time.toFixed(3) + ' s',
-                    '  Sync Sum:     ' + Sync_Time.toFixed(3) + ' s',
-                    '  Saving:       ' + (
-                        ((Sync_Time - Async_Time) / Sync_Time) * 100
-                    ).toFixed(2) + ' %'
-                ].join("\n\n"));
-
-                BOM.iShadowCover.close();
-            });
+        DOM_Load(JS_Item, Load_End);
     };
 
 })(self, self.document, self.iQuery);
