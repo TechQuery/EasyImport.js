@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-5-27)  Stable
+//      [Version]    v1.0  (2015-5-29)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -101,88 +101,11 @@ self.onerror = function () {
             }
         });
 
-//  JSON.format()  v0.3
-    var iValue;
+//  JSON Extension  v0.4
 
-    function JSON_ValueOut(iObject) {
-        var This_Func = arguments.callee;
-        var Recursive = (This_Func === This_Func.caller),
-            iStruct;
-        if (! Recursive)  iValue = [ ];
-
-        if (iObject instanceof Array) {
-            iStruct = [ ];
-            for (var i = 0; i < iObject.length; i++)
-                iStruct.push(
-                    This_Func(iObject[i])
-                );
-        } else if ((!! iObject) && (typeof iObject == 'object')) {
-            iStruct = { };
-            for (var iKey in iObject) {
-                if ((iKey == 'toString') && (typeof iObject[iKey] == 'function'))
-                    continue;
-                iStruct[iKey] = This_Func(iObject[iKey]);
-            }
-        } else {
-            iStruct = '';
-            iValue.push(iObject);
-        }
-
-        if (Recursive)
-            return iStruct;
-        else
-            return [iStruct, iValue];
-    }
-
-    function JSON_ValueIn(iString, iValue) {
-        for (var i = 0; i < iValue.length; i++) {
-            if (typeof iValue[i] == 'string')
-                iValue[i] = iValue[i].replace(/"/g, "\\\"");
-            iString = iString.replace('""', '"' + iValue[i] + '"');
-        }
-        return iString;
-    }
-
-    BOM.JSON.format = function (iJSON) {
-        iJSON = JSON_ValueOut(iJSON);
-        iJSON[0] = JSON.stringify(iJSON[0]);
-
-        var iStart = {'"': 0,  '[': 0,  '{': 0},
-            iEnd = {']': 0,  '}': 0};
-
-        for (var i = 0, iLevel = 0, Indent; i < iJSON[0].length; i++) {
-            switch (iJSON[0][i]) {
-                case '{':    ;
-                case '[':    {
-                    if (! (iJSON[0][i + 1] in iStart)) continue;
-                    iLevel++ ;
-                }  break;
-                case ',':    break;
-                case '"':    if (iJSON[0][i + 1] == ':') {
-                    iJSON[0] = iJSON[0].slice(0, ++i + 1) + '    ' + iJSON[0].slice(i + 1);
-                    i += 4;
-                    continue;
-                }
-                case ']':    ;
-                case '}':    {
-                    if (! (iJSON[0][i + 1] in iEnd)) continue;
-                    iLevel-- ;
-                }  break;
-                case "\\":    {
-                    i++;  continue;
-                }  break; 
-                default:     continue;
-            }
-            if (iLevel < 0) try {
-                debug();
-            } catch (iError) {
-                break;
-            }
-            Indent = "\n" + '    '.repeat(iLevel);
-            iJSON[0] = iJSON[0].slice(0, i + 1) + Indent + iJSON[0].slice(i + 1);
-            i += Indent.length;
-        }
-        return JSON_ValueIn(iJSON[0], iJSON[1]);
+    BOM.JSON.format = function () {
+        return  this.stringify(arguments[0], null, 4)
+            .replace(/(\s+"[^"]+":) ([^\s]+)/g, '$1    $2');
     };
 
     BOM.JSON.parseAll = function (iJSON) {
@@ -194,6 +117,8 @@ self.onerror = function () {
                 return iValue;
             });
     };
+
+//  New Window Fix  v0.3
 
     BOM.new_Window_Fix = function (Fix_More) {
         if (! this)  return false;
