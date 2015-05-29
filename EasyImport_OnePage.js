@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-5-15)  Stable
+//      [Version]    v1.0  (2015-5-29)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -84,6 +84,11 @@ self.onerror = function () {
             return -1;
         };
 
+    if (! Date.now)
+        Date.now = function () {
+            return  (new Date()).getTime();
+        };
+
     if ( BOM.navigator.userAgent.match(/; rv:(\d+)[^\/]+Gecko\/\d+/) )
         Object.defineProperty(HTMLElement, 'innerText', {
             set:    function (iText) {
@@ -96,97 +101,32 @@ self.onerror = function () {
             }
         });
 
-//  JSON.format()  v0.3
-    var iValue;
+//  JSON Extension  v0.4
 
-    function JSON_ValueOut(iObject) {
-        var This_Func = arguments.callee;
-        var Recursive = (This_Func === This_Func.caller),
-            iStruct;
-        if (! Recursive)  iValue = [ ];
-
-        if (iObject instanceof Array) {
-            iStruct = [ ];
-            for (var i = 0; i < iObject.length; i++)
-                iStruct.push(
-                    This_Func(iObject[i])
-                );
-        } else if ((!! iObject) && (typeof iObject == 'object')) {
-            iStruct = { };
-            for (var iKey in iObject) {
-                if ((iKey == 'toString') && (typeof iObject[iKey] == 'function'))
-                    continue;
-                iStruct[iKey] = This_Func(iObject[iKey]);
-            }
-        } else {
-            iStruct = '';
-            iValue.push(iObject);
-        }
-
-        if (Recursive)
-            return iStruct;
-        else
-            return [iStruct, iValue];
-    }
-
-    function JSON_ValueIn(iString, iValue) {
-        for (var i = 0; i < iValue.length; i++) {
-            if (typeof iValue[i] == 'string')
-                iValue[i] = iValue[i].replace(/"/g, "\\\"");
-            iString = iString.replace('""', '"' + iValue[i] + '"');
-        }
-        return iString;
-    }
-
-    BOM.JSON.format = function (iJSON) {
-        iJSON = JSON_ValueOut(iJSON);
-        iJSON[0] = JSON.stringify(iJSON[0]);
-
-        var iStart = {'"': 0,  '[': 0,  '{': 0},
-            iEnd = {']': 0,  '}': 0};
-
-        for (var i = 0, iLevel = 0, Indent; i < iJSON[0].length; i++) {
-            switch (iJSON[0][i]) {
-                case '{':    ;
-                case '[':    {
-                    if (! (iJSON[0][i + 1] in iStart)) continue;
-                    iLevel++ ;
-                }  break;
-                case ',':    break;
-                case '"':    if (iJSON[0][i + 1] == ':') {
-                    iJSON[0] = iJSON[0].slice(0, ++i + 1) + '    ' + iJSON[0].slice(i + 1);
-                    i += 4;
-                    continue;
-                }
-                case ']':    ;
-                case '}':    {
-                    if (! (iJSON[0][i + 1] in iEnd)) continue;
-                    iLevel-- ;
-                }  break;
-                case "\\":    {
-                    i++;  continue;
-                }  break; 
-                default:     continue;
-            }
-            if (iLevel < 0) try {
-                debug();
-            } catch (iError) {
-                break;
-            }
-            Indent = "\n" + '    '.repeat(iLevel);
-            iJSON[0] = iJSON[0].slice(0, i + 1) + Indent + iJSON[0].slice(i + 1);
-            i += Indent.length;
-        }
-        return JSON_ValueIn(iJSON[0], iJSON[1]);
+    BOM.JSON.format = function () {
+        return  this.stringify(arguments[0], null, 4)
+            .replace(/(\s+"[^"]+":) ([^\s]+)/g, '$1    $2');
     };
+
+    BOM.JSON.parseAll = function (iJSON) {
+        return  this.parse(iJSON,  function (iKey, iValue) {
+                if (iKey && (typeof iValue == 'string'))  try {
+                    return  BOM.JSON.parse(iValue);
+                } catch (iError) { }
+
+                return iValue;
+            });
+    };
+
+//  New Window Fix  v0.3
 
     BOM.new_Window_Fix = function (Fix_More) {
         if (! this)  return false;
 
-        var _Window_ = this.opener,
-            This_DOM = this.document;
-
         try {
+            var _Window_ = this.opener,
+                This_DOM = this.document;
+
             if (_Window_ && (this.location.href == 'about:blank'))
                 This_DOM.domain = _Window_.document.domain;
 
@@ -197,6 +137,7 @@ self.onerror = function () {
         }
         if (Fix_More)
             Fix_More.call(this);
+
         return true;
     };
 
@@ -220,6 +161,8 @@ self.onerror = function () {
     var is_Mobile = (
             is_Pad || is_Phone || UA.match(/Mobile/i)
         ) && (! UA.match(/ PC /));
+    var is_iOS = is_Mobile && UA.match(/(iTouch|iPhone|iPad|iWatch);[^\)]+CPU[^\)]+OS (\d)_/i),
+        is_Android = UA.match(/(Android |Silk\/)(\d+\.\d+)/i);
 
     var _Browser_ = {
             msie:             IE_Ver,
@@ -228,17 +171,22 @@ self.onerror = function () {
             mobile:           !! is_Mobile,
             pad:              !! is_Pad,
             phone:            !! is_Phone,
+            ios:              is_iOS && is_iOS[2],
+            android:          is_Android && is_Android[2],
             versionNumber:    IE_Ver || FF_Ver
         };
 
 
 /* ----- Object Base ----- */
-    function _Extend_(iTarget, iSource) {
-        iTarget = iTarget || { };
+    function _Extend_(iTarget) {
+        iTarget = iTarget || (
+            (arguments[1] instanceof Array)  ?  [ ]  :  { }
+        );
 
-        for (var iKey in iSource)
-            if ( Object.prototype.hasOwnProperty.call(iSource, iKey) )
-                iTarget[iKey] = iSource[iKey];
+        for (var i = 1;  i < arguments.length;  i++)
+            for (var iKey in arguments[i])
+                if ( Object.prototype.hasOwnProperty.call(arguments[i], iKey) )
+                    iTarget[iKey] = arguments[i][iKey];
 
         return iTarget;
     }
@@ -427,7 +375,8 @@ self.onerror = function () {
             left:               true
         },
         get:          function (iElement, iName) {
-            if (_Type_(iElement) in Type_Info.DOM.root)  return null;
+            if ((! iElement) || (_Type_(iElement) in Type_Info.DOM.root))
+                return null;
 
             var iScale = 1;
 
@@ -612,53 +561,12 @@ self.onerror = function () {
             }
         };
 
-    var _Event_ = _Browser_.modern ? {
-            bind:    function () {
-                arguments[0].addEventListener(arguments[1], arguments[2], false);
-            },
-            trig:    function () {
-                var iEvent = DOM.createEvent('HTMLEvents');
-                iEvent.initEvent(arguments[1], true, true);
-                arguments[0].dispatchEvent(iEvent);
-            }
-        } : {
-            bind:    function (iElement, iType, iCallback) {
-                var This_DOM = (_Type_(iElement) == 'Document') ?
-                        iElement : (iElement.ownerDocument || iElement.document);
+    /* ----- W3C Event Method Wrapper ----- */
+    if (! _Browser_.modern) {
+        _Get_Set_.Data._Name_.event_ie = true;
 
-                //  Custom DOM Event
-                if (Type_Info.DOM_Event.indexOf(iType) == -1) {
-                    if (! _Operator_('Data', [iElement], 'custom-event')) {
-                        _Operator_('Data', [iElement], 'custom-event', true);
-                        iType = 'propertychange';
-                    } else  iType = '';
-
-                    if (! _Operator_('Attribute',  [iElement],  'on' + iType))
-                        _Operator_('Attribute',  [iElement],  'on' + iType,  _Time_.now());
-                }
-
-                //  Patch to W3C DOM Event
-                if (iType == 'DOMContentLoaded') {
-                    if (BOM !== BOM.top)  iType = 'load';
-                    else {
-                        _Time_.every(0.01, function () {
-                            try {
-                                This_DOM.documentElement.doScroll('left');
-                                iCallback.call(This_DOM, BOM.event);
-                                return false;
-                            } catch (Err) {
-                                return;
-                            }
-                        });
-                        return iElement;
-                    }
-                }
-                if ((_Type_(iElement) != 'Window') && (iType == 'load'))
-                    iType = 'readystatechange';
-
-                if (! iType)  return;
-
-                iElement.attachEvent('on' + iType, function () {
+        function IE_Event_Handler(iElement, iCallback) {
+            return  function () {
                     var iEvent = _Extend_(
                             new (function HTMLEvent () {})(),
                             BOM.event
@@ -666,8 +574,8 @@ self.onerror = function () {
                         Loaded;
 
                     switch (iEvent.type) {
-                        case 'readystatechange':    
-                            Loaded = iElement.readyState.match(/loaded|complete/);  break;
+                        case 'readystatechange':    ;
+//                            Loaded = iElement.readyState.match(/loaded|complete/);  break;
                         case 'load':
                             Loaded = (iElement.readyState == 'loaded');  break;
                         case 'propertychange':
@@ -689,9 +597,74 @@ self.onerror = function () {
                             mouseleave:    iEvent.toElement || iEvent.fromElement
                         })[iEvent.type]
                     }));
-                });
+                };
+        }
+    }
+
+    var _Event_ = _Browser_.modern ? {
+            bind:      function (iElement, iType, iCallback) {
+                iElement.addEventListener(iType, iCallback, false);
             },
-            trig:    function (iElement, iType) {
+            unbind:    function (iElement, iType, iCallback) {
+                iElement.removeEventListener(iType, iCallback, false);
+            },
+            trig:      function () {
+                var iEvent = DOM.createEvent('HTMLEvents');
+                iEvent.initEvent(arguments[1], true, true);
+                arguments[0].dispatchEvent(iEvent);
+            }
+        } : {
+            bind:      function (iElement, iType, iCallback) {
+                var This_DOM = (_Type_(iElement) == 'Document') ?
+                        iElement : (iElement.ownerDocument || iElement.document);
+
+                //  Custom DOM Event
+                if (Type_Info.DOM_Event.indexOf(iType) == -1) {
+                    if (! _Operator_('Data', [iElement], 'custom-event')) {
+                        _Operator_('Data', [iElement], 'custom-event', true);
+                        iType = 'propertychange';
+                    } else  iType = '';
+
+                    if (! _Operator_('Attribute',  [iElement],  'on' + iType))
+                        _Operator_('Attribute',  [iElement],  'on' + iType,  _Time_.now());
+                }
+
+                //  Patch to W3C DOM Event
+                if (iCallback && (iType == 'DOMContentLoaded')) {
+                    if (BOM !== BOM.top)  iType = 'load';
+                    else {
+                        _Time_.every(0.01, function () {
+                            try {
+                                This_DOM.documentElement.doScroll('left');
+                                iCallback.call(This_DOM, BOM.event);
+                                return false;
+                            } catch (Err) {
+                                return;
+                            }
+                        });
+                        return;
+                    }
+                }
+                if ((_Type_(iElement) != 'Window') && (iType == 'load'))
+                    iType = 'readystatechange';
+
+                if (! iType)  return;
+
+                //  Event Handler Patch
+                var _Handler_ = _Operator_('Data', [iElement], 'event_ie');
+
+                if (! _Handler_) {
+                    _Handler_ = IE_Event_Handler(iElement, iCallback);
+                    _Operator_('Data', [iElement], 'event_ie', _Handler_);
+                }
+                iElement[
+                    (iCallback ? 'at' : 'de') + 'tachEvent'
+                ]('on' + iType,  _Handler_);
+            },
+            unbind:    function () {
+                this.bind(arguments[0], arguments[1]);
+            },
+            trig:      function (iElement, iType) {
                 iType = iType.toLowerCase();
 
                 if (Type_Info.DOM_Event.indexOf(iType) > -1) {
@@ -703,7 +676,21 @@ self.onerror = function () {
             }
         };
 
+    /* ----- Event Proxy Layer ----- */
     _Get_Set_.Data._Name_.event = true;
+
+    function Proxy_Handler(iEvent) {
+        var iHandler = _Operator_('Data', [this], 'event')[iEvent.type],
+            iReturn;
+
+        for (var i = 0, _Return_;  i < iHandler.length;  i++) {
+            _Return_ = iHandler[i].apply(this, arguments);
+            if (typeof _Return_ == 'undefined')
+                iReturn = _Return_;
+        }
+
+        return iReturn;
+    }
 
     function Event_Switch(iElement, iType, iCallback) {
         if (iType.indexOf('DOM') != 0)
@@ -715,24 +702,15 @@ self.onerror = function () {
 
         if (! Event_Data[iType]) {
             Event_Data[iType] = [ ];
-            _Event_.bind(iElement, iType, function (iEvent) {
-                var iHandler = _Operator_('Data', [iElement], 'event')[iEvent.type],
-                    iReturn;
-
-                for (var i = 0, _Return_;  i < iHandler.length;  i++) {
-                    _Return_ = iHandler[i].apply(this, arguments);
-                    if (typeof _Return_ == 'undefined')
-                        iReturn = _Return_;
-                }
-
-                return iReturn;
-            });
+            _Event_.bind(iElement, iType, Proxy_Handler);
         }
 
         if (iCallback)
             Event_Data[iType].push( iCallback );
-        else
+        else {
             Event_Data[iType] = null;
+            _Event_.unbind(iElement, iType, Proxy_Handler);
+        }
 
         _Operator_('Data', [iElement], 'event', Event_Data);
     }
@@ -914,7 +892,7 @@ self.onerror = function () {
                     var iResponse = this.responseText.trim();
 
                     try {
-                        iResponse = BOM.JSON.parse(iResponse);
+                        iResponse = BOM.JSON.parseAll(iResponse);
                     } catch (iError) {
                         try {
                             iResponse = XML_Parse(iResponse);
@@ -1024,11 +1002,11 @@ self.onerror = function () {
         param:            function (iObject) {
             var iParameter = [ ];
 
-            if ( $.isPlainObject(iObject) )
+            if ( $.isPlainObject(iObject) ) {
                 for (var iName in iObject)
                     if ($.type(iObject[iName]) in Type_Info.Data)
                         iParameter.push(iName + '=' + iObject[iName]);
-            else if (iObject instanceof $)
+            } else if (iObject instanceof $)
                 for (var i = 0;  i < iObject.length;  i++)
                     iParameter.push(iObject[i].name + '=' + iObject[i].value);
 
@@ -1036,7 +1014,7 @@ self.onerror = function () {
         },
         paramJSON:        function (Args_Str) {
             Args_Str = (Args_Str || BOM.location.search).match(/^[^\?]*\?([^\s]+)$/);
-            if (! Args_Str) return;
+            if (! Args_Str)  return { };
 
             var iArgs = Args_Str[1].split('&'),
                 _Args_ = {
@@ -1045,16 +1023,20 @@ self.onerror = function () {
                     }
                 };
 
-            for (var i = 0; i < iArgs.length; i++) {
+            for (var i = 0, iValue; i < iArgs.length; i++) {
                 iArgs[i] = iArgs[i].split('=');
-                iArgs[i][1] = BOM.decodeURIComponent( iArgs[i][1] );
+
+                iValue = BOM.decodeURIComponent(
+                    iArgs[i].slice(1).join('=')
+                );
                 try {
-                    iArgs[i][1] = BOM.JSON.parse(iArgs[i][1]);
+                    iValue = BOM.JSON.parse(iValue);
                 } catch (iError) { }
-                _Args_[ iArgs[i][0] ] = iArgs[i][1];
+
+                _Args_[ iArgs[i][0] ] = iValue;
             }
 
-            return  iArgs.length ? _Args_ : null;
+            return  iArgs.length ? _Args_ : { };
         },
         data:             function (iElement, iName, iValue) {
             if (iValue  &&  (iName in _Get_Set_.Data._Name_))
@@ -1070,31 +1052,31 @@ self.onerror = function () {
     
     /* ----- HTTP Client ----- */
     function iHTTP(iURL, iData, iCallback) {
-        iURL = iURL.split('?')[0] + '?' + $.param(
-            $.extend($.paramJSON(iURL), {_:  $.now()})
-        );
-
         var HTTP_Client = iAJAX(
                 arguments,
                 iCallback.name || X_Domain(iURL)
             );
         HTTP_Client.onready = iCallback;
         HTTP_Client.open(iData ? 'POST' : 'GET', iURL, true);
+        if (iData)
+            HTTP_Client.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 //        HTTP_Client.setRequestHeader('If-Modified-Since', 0);
         HTTP_Client.send(
-            (typeof iData == 'string') ? iData : BOM.JSON.stringify(JSON)
+            (typeof iData == 'string') ?
+                iData : BOM.encodeURI( $.param(iData || { }) )
         );
 
         return HTTP_Client;
     }
 
     _Extend_($, {
-        get:     function () {
-            return  iHTTP(arguments[0], null, arguments[1]);
+        get:     function (iURL, iData, iCallback) {
+            iURL = iURL.split('?')[0] + '?' + $.param(
+                $.extend($.paramJSON(iURL),  iData,  {_:  $.now()})
+            );
+            return  iHTTP(iURL, null, iCallback);
         },
-        post:    function () {
-            return  iHTTP(arguments[0], arguments[1], arguments[2]);
-        }
+        post:    iHTTP
     });
 
     /* ----- iQuery Instance Method ----- */
@@ -1274,17 +1256,24 @@ self.onerror = function () {
             var $_This = this,  $_Result = [ ];
 
             for (var i = 0;  i < $_This.length;  i++)
-                $_Result = $_Result.concat( $(arguments[0], $_This[i]) );
+                $_Result = [ ].concat.apply($_Result, $(arguments[0], $_This[i]));
 
             return  $.extend($($_Result), {prevObject:  $_This});
         },
         text:           function (iText) {
-            for (var i = 0;  i < this.length;  i++)
-                this[i].innerText = iText;
+            var iResult = [ ];
 
-            return  this;
+            for (var i = 0;  i < this.length;  i++)
+                if (! iText)
+                    iResult.push( this[i].innerText );
+                else
+                    this[i].innerText = iText;
+
+            return  iResult.length ? iResult.join('') : this;
         },
         html:           function (iHTML) {
+            if (! iHTML)  return this[0].innerHTML;
+
             for (var i = 0;  i < this.length;  i++)
                 this[i].innerHTML = iHTML;
 
@@ -1480,6 +1469,14 @@ self.onerror = function () {
                 this[i].parentNode.removeChild(this[i]);
 
             _Operator_('Data', this);
+
+            return this;
+        },
+        empty:          function () {
+            var iChild = this.children().remove();
+
+            for (var i = 0;  i < iChild.length;  i++)
+                iChild[i].innerHTML = '';
 
             return this;
         },
@@ -1803,38 +1800,38 @@ self.onerror = function () {
 
 
 
-/* ----- 模态框/遮罩层（全局） v0.2 ----- */
+/* ----- 模态框/遮罩层（全局） v0.3 ----- */
 (function (BOM, DOM, $) {
 
     BOM.iShadowCover = {
-        DOM:      $('<div id="iSC"><div /></div>')[0],
+        $_DOM:      $('<div id="iSC"><div /></div>'),
         open:     function (iContent, closeCB) {
             this.locked = ($.type(iContent) == 'Window');
 
             if (! this.locked)
-                $(this.DOM.firstChild).append(iContent);
+                $(this.$_DOM[0].firstChild).append(iContent);
             else
                 this.Content = iContent;
 
-            this.DOM.style.height = BOM.innerHeight || DOM.body.clientHeight;
-            this.DOM.style.display = 'table';
+            this.$_DOM.height( $(BOM).height() ).css('display', 'table');
             this.closed = false;
             this.onclose = closeCB;
 
             return iContent;
         },
         close:    function () {
-            this.DOM.style.display = 'none';
-            this.DOM.firstChild.innerHTML = '';
+            this.$_DOM.hide().attr('class', '');
+            $(this.$_DOM[0].firstChild).empty();
             this.closed = true;
             if (this.onclose)
-                this.onclose.call(this.DOM);
+                this.onclose.call(this.$_DOM[0]);
         }
     };
 
     $(DOM).ready(function () {
-        $(this.body.firstElementChild || this.body.firstChild).before(BOM.iShadowCover.DOM);
-    }).bind('keydown', function () {
+        $(this.body.firstElementChild || this.body.firstChild)
+            .before(BOM.iShadowCover.$_DOM);
+    }).keydown(function () {
         if (BOM.iShadowCover.closed) return;
 
         if (! BOM.iShadowCover.locked) {
@@ -1844,7 +1841,7 @@ self.onerror = function () {
             BOM.iShadowCover.Content.focus();
     });
 
-    $(BOM.iShadowCover.DOM).bind('click', function () {
+    BOM.iShadowCover.$_DOM.click(function () {
         if (! BOM.iShadowCover.locked) {
             if (arguments[0].target.parentNode === this)
                 BOM.iShadowCover.close();
@@ -1891,7 +1888,7 @@ self.onerror = function () {
                 .add('<base target="_self" />')
                 .appendTo(this.document.head);
 
-            $(this.document).bind('keydown', function (iEvent) {
+            $(this.document).keydown(function (iEvent) {
                 var iKeyCode = iEvent.which;
 
                 if (
@@ -1904,7 +1901,7 @@ self.onerror = function () {
                     return false;
             }).bind('contextmenu', function () {
                 return false;
-            }).bind('mousedown', function () {
+            }).mousedown(function () {
                 if (arguments[0].which == 3)
                     return false;
             });
@@ -1978,7 +1975,7 @@ self.onerror = function () {
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v0.9  (2015-5-15)  Stable
+//      [Version]    v1.1  (2015-5-22)  Beta
 //
 //      [Usage]      Only for loading JavaScript files in Single-Page Web,
 //                   no Inherit support for Frames.
@@ -1990,7 +1987,7 @@ self.onerror = function () {
 
 (function (BOM, DOM, $) {
 
-// ----------- Inner Basic Member ----------- //
+/* ----------- Basic Data ----------- */
     var UA = navigator.userAgent,
         RE_FileName = BOM.iRegExp('^[^\\?]*?\\/?([^\\/\\?]+)(\\?.+)?$', undefined, null);
 
@@ -2012,7 +2009,9 @@ self.onerror = function () {
 
     var Last_Loaded = $.now();
 
-// ----------- Standard Mode Meta Patches ----------- //
+
+
+/* ----------- Standard Mode Meta Patches ----------- */
     if ($.browser.mobile) {
         if ($.browser.modern) {
             var is_WeChat = UA.match(/MicroMessenger/i),
@@ -2047,7 +2046,8 @@ self.onerror = function () {
             content:         'IE=Edge, Chrome=1'
         });
 
-// ----------- Inner Logic Module ----------- //
+
+/* ---------- Loading Queue ---------- */
     var UA_Rule = {
             old_PC:    ! $.browser.modern,
             Mobile:    $.browser.mobile,
@@ -2058,56 +2058,60 @@ self.onerror = function () {
     function iQueue() {
         this.length = 0;
     }
-    iQueue.prototype.push = [ ].push;
-    iQueue.prototype.shift = [ ].shift;
-    iQueue.prototype.splice = [ ].splice;
-    iQueue.prototype.slice = [ ].slice;
-    iQueue.prototype.newGroup = function () {
-        var _Length_;
+    $.extend(iQueue.prototype, {
+        push:        [ ].push,
+        shift:       [ ].shift,
+        splice:      [ ].splice,
+        slice:       [ ].slice,
+        newGroup:    function () {
+            var _Length_;
 
-        if ((! this.length) || this.slice(-1)[0].length) {
-            _Length_ = this.push($.extend([ ],  {
-                loaded:    0
-            }));
-            this.lastGroup = this.slice(-1)[0];
+            if ((! this.length) || this.slice(-1)[0].length) {
+                _Length_ = this.push($.extend([ ],  {
+                    loaded:    0
+                }));
+                this.lastGroup = this.slice(-1)[0];
+            }
+            return _Length_;
+        },
+        add:         function (iFileName) {
+            if (! iFileName.match(/^http(s)?:\/\//))
+                iFileName = Root_Path + iFileName;
+            this[this.length - 1].push( iFileName );
         }
-        return _Length_;
-    };
-    iQueue.prototype.add = function (iFileName) {
-        if (! iFileName.match(/^http(s)?:\/\//))
-            iFileName = Root_Path + iFileName;
-        this[this.length - 1].push( iFileName );
-    };
+    });
 
-    function SL_Set(RP, List0) {
-        for (var i = 0; i < List0.length; i++)
-            if (! (List0[i] instanceof Array))
-                List0[i] = [List0[i]];
+    function Make_Queue(iList) {
+        for (var i = 0; i < iList.length; i++)
+            if (! (iList[i] instanceof Array))
+                iList[i] = [iList[i]];
 
-        var List1 = new iQueue();
-        for (var i = 0; i < List0.length; i++) {
-            List1.newGroup();
-            for (var j = 0, _Item_; j < List0[i].length; j++) {
-                _Item_ = List0[i][j];
+        var _Queue_ = new iQueue();
+        for (var i = 0; i < iList.length; i++) {
+            _Queue_.newGroup();
+            for (var j = 0, _Item_; j < iList[i].length; j++) {
+                _Item_ = iList[i][j];
                 if (typeof _Item_ == 'string')
-                    List1.add(_Item_);
+                    _Queue_.add(_Item_);
                 else {
                     var no_Break = true;
                     for (RI in UA_Rule)  if (UA_Rule[RI]) {
                         if (_Item_[RI] === false)
                             no_Break = false;
                         else if (_Item_[RI])
-                            List1.add(_Item_[RI]);
+                            _Queue_.add(_Item_[RI]);
                         break;
                     }
                 }
-                if (no_Break && (! List1.lastGroup[j]) && _Item_.new_PC)
-                    List1.add(_Item_.new_PC);
+                if (no_Break && (! _Queue_.lastGroup[j]) && _Item_.new_PC)
+                    _Queue_.add(_Item_.new_PC);
             }
         }
-        return List1;
+        return _Queue_;
     }
 
+
+/* ---------- DOM Load-Engine ---------- */
     function DOM_Load(iOrder, iFinal) {
         if (! iOrder[0]) {
             iFinal();
@@ -2129,7 +2133,7 @@ self.onerror = function () {
             if ( iOrder[0][++This_Group] )  return;
 
             $(this).data('Load_During', $.end(
-                this.src.split('/').slice(-1)[0]
+                this.src.match(RE_FileName)[1]
             ));
             iOrder.shift();
             This_Call.callee.apply(this, This_Call);
@@ -2150,8 +2154,45 @@ self.onerror = function () {
                 src:        iScript,
                 onload:     _Next_
             });
-            $.start( iScript.split('/').slice(-1)[0] );
+            $.start( iScript.match(RE_FileName)[1] );
         }
+    }
+
+/* ---------- AMD Load-Engine ---------- */
+    $_Head.data('AMD',  { });
+
+    BOM.define = function () {
+        var _Args_ = $.makeArray(arguments),
+            _Module_ = $_Head.data('AMD'),
+            iModule = { };
+
+        iModule.name = (typeof _Args_[0] == 'string') ? _Args_.shift() : Last_Loaded;
+        iModule.dependence = (_Args_[0] instanceof Array)  ?  _Args_.shift()  :  [ ];
+        iModule.body = _Args_[0];
+
+        if (! _Module_[iModule.name])
+            _Module_[iModule.name] = [ ];
+        _Module_[iModule.name].push(iModule);
+    };
+
+    BOM.define.amd = 'EasyImport.js';
+
+    BOM.require = function () {
+        return  $_Head.data('AMD')[
+                arguments[0].match(RE_FileName)[1]
+            ].export;
+    };
+
+    function Depend_Array(All_Module, iDepend) {
+        for (var i = 0;  i < iDepend.length;  i++)
+            switch (iDepend[i]) {
+                case 'require':    iDepend[i] = BOM.require;  break;
+                case 'export':     iDepend[i] = this;         break;
+                default:
+                    iDepend[i] = All_Module[iDepend[i]].export;
+            }
+
+        return iDepend;
     }
 
     function AMD_Load(iOrder, iFinal) {
@@ -2167,27 +2208,38 @@ self.onerror = function () {
                 $_Head.data('AMD', _Module_);
             }
 
-            for (var i = 0;  i < iOrder.length;  i++)
-                if (iOrder[i].loaded != iOrder[i].length) {
-                    for (var j = 0;  j < iOrder[i].length;  j++) {
-                        iModule = _Module_[ iOrder[i][j].match(RE_FileName)[1] ];
-                        if (! iModule)  continue;
+            $.each(iOrder, function () {
+                if (this.loaded == this.length)  return;
 
-                        for (var k = 0;  k < iModule.length;  k++)
-                            iModule[k].body.apply(this, iModule[k].dependence);
+                for (var i = 0;  i < this.length;  i++) {
+                    iModule = _Module_[ this[i].match(RE_FileName)[1] ];
+                    if (! iModule)  continue;
 
-                        iOrder[i].loaded++ ;
-                    }
-                    break;
+                    for (var j = 0, _Export_, iExport;  j < iModule.length;  j++)
+                        if (typeof iModule[j].body == 'function') {
+                            _Export_ = iModule[j].body.apply(this,
+                                Depend_Array.call(iExport, _Module_, iModule[j].dependence)
+                            );
+                            _Export_ = _Export_ || iExport;
+                            if (_Export_)
+                                iModule[j].export = _Export_;
+                        } else
+                            iModule[j].export = iModule[j].body;
+
+                    this.loaded++ ;
                 }
+                return false;
+            });
         }
+
+        var iFunc = 0;
 
         $.each(iOrder,  function (i) {
             var This_Call = arguments;
 
             if ((i + 1) == iOrder.length) {
                 $(DOM).ready(function () {
-                    This_Call.callee.call(iOrder[i], ++i);
+                    This_Call.callee.call(this, ++i);
                     iFinal();
                 });
                 return;
@@ -2203,10 +2255,25 @@ self.onerror = function () {
                         onload:     _Next_
                     });
                 else
-                    this[j]();
+                    BOM.define(this[j].name || ('Func_' + iFunc++),  [ ],  this[j]);
             }
         });
     }
+
+// ----------- Open API ----------- //
+    $.cssRule({
+        '#iSC.EasyImport': {
+            background:    'darkgray'
+        },
+        '#iSC.EasyImport h1': {
+            color:    'white'
+        }
+    });
+    $(DOM).ready(function () {
+        $('#iSC').addClass('EasyImport');
+        BOM.showModalDialog($('<h1>Loading...</h1>'), 1);
+    });
+
 
     function Load_End() {
         if (Load_Times > 1)  return;
@@ -2228,23 +2295,8 @@ self.onerror = function () {
         BOM.iShadowCover.close();
     }
 
-    $.cssRule({
-        '#iSC': {
-            background:    'darkgray'
-        },
-        '#iSC h1': {
-            color:    'white'
-        }
-    });
-    $(DOM).ready(function () {
-        BOM.showModalDialog($('<h1>Loading...</h1>'), 1);
-    });
 
-
-// ----------- Open API ----------- //
     BOM.ImportJS = function () {
-        Load_Times++ ;
-
         var Func_Args = $.makeArray(arguments),
             JS_List,  CallBack;
 
@@ -2258,7 +2310,7 @@ self.onerror = function () {
             Func_Args.shift() : null;
 
 
-        var JS_Item = SL_Set(Root_Path, JS_List);
+        var JS_Item = Make_Queue(JS_List);
         if (CallBack)  JS_Item.push([CallBack]);
 
         if (! JS_Item[0].length)  return;
@@ -2268,25 +2320,5 @@ self.onerror = function () {
         else
             AMD_Load(JS_Item, Load_End);
     };
-
-
-/* ---------- AMD Support ---------- */
-    $_Head.data('AMD',  { });
-
-    BOM.define = function () {
-        var _Args_ = $.makeArray(arguments),
-            _Module_ = $_Head.data('AMD'),
-            iModule = { };
-
-        iModule.name = (typeof _Args_[0] == 'string') ? _Args_.shift() : Last_Loaded;
-        iModule.dependence = (_Args_[0] instanceof Array)  ?  _Args_.shift()  :  [ ];
-        iModule.body = _Args_[0];
-
-        if (! _Module_[iModule.name])
-            _Module_[iModule.name] = [ ];
-        _Module_[iModule.name].push(iModule);
-    };
-
-    BOM.define.amd = '';
 
 })(self, self.document, self.iQuery);
