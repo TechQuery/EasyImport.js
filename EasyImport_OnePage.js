@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-6-18)  Stable
+//      [Version]    v1.0  (2015-6-24)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -169,7 +169,7 @@
         };
 
 
-/* ----- Object Base ----- */
+/* ---------- Object Base ---------- */
     function _Each_(Arr_Obj, iEvery) {
         if (! Arr_Obj)  return;
 
@@ -302,7 +302,7 @@
     }
 
 
-/* ----- DOM Info Operator - Get first, set all. ----- */
+/* ---------- DOM Info Operator - Get first, set all. ---------- */
     var _Get_Set_ = {
             Get_Name_Type:    {
                 'String':    true,
@@ -482,24 +482,6 @@
         }
     };
 
-    var inVisible = {
-            display:       'none',
-            visibility:    'hidden',
-            width:         0
-        };
-
-    function is_Visible(iElement) {
-        var iStyle = _Operator_('Style', [iElement], [
-                'display',  'visibility',  'width'
-            ]);
-
-        for (var iKey in iStyle)
-            if (iStyle[iKey] == inVisible[iKey])
-                return false;
-        return true;
-    }
-
-
     /* ----- DOM Attribute ----- */
     _Get_Set_.Attribute = {
         alias:    {
@@ -555,7 +537,7 @@
         }
     };
 
-/* ----- DOM Event ----- */
+/* ---------- DOM Event ---------- */
     var _Time_ = {
             _Root_:     BOM,
             now:        Date.now,
@@ -593,12 +575,22 @@
     if (! _Browser_.modern) {
         _Get_Set_.Data._Name_.event_ie = true;
 
+        function HTMLEvents() {
+            this.bubbles = true;
+            this.eventPhase = 3;
+            this.view = BOM;
+        }
+        HTMLEvents.prototype.preventDefault = function () {
+            BOM.event.returnValue = false;
+            this.defaultPrevented = true;
+        };
+        HTMLEvents.prototype.stopPropagation = function () {
+            BOM.event.cancelBubble = true;
+        };
+
         function IE_Event_Handler(iElement, iCallback) {
             return  function () {
-                    var iEvent = _Extend_(
-                            new (function HTMLEvent () {})(),
-                            BOM.event
-                        ),
+                    var iEvent = _Extend_(new HTMLEvents(), BOM.event),
                         Loaded;
 
                     switch (iEvent.type) {
@@ -614,17 +606,22 @@
                     }
                     if (! Loaded)  return;
 
-                    iCallback.call(iElement, _Extend_(iEvent, {
-                        target:           iEvent.srcElement,
-                        which:            (iEvent.type.slice(0, 3) == 'key') ?
-                            iEvent.keyCode  :  [0, 1, 3, 0, 2, 0, 0, 0][iEvent.button],
-                        relatedTarget:    ({
-                            mouseover:     iEvent.fromElement,
-                            mouseout:      iEvent.toElement,
-                            mouseenter:    iEvent.fromElement || iEvent.toElement,
-                            mouseleave:    iEvent.toElement || iEvent.fromElement
-                        })[iEvent.type]
-                    }));
+                    var iReturn = iCallback.call(iElement,  _Extend_(iEvent, {
+                            target:             iEvent.srcElement,
+                            which:              (iEvent.type.slice(0, 3) == 'key') ?
+                                iEvent.keyCode  :  [0, 1, 3, 0, 2, 0, 0, 0][iEvent.button],
+                            relatedTarget:      ({
+                                mouseover:     iEvent.fromElement,
+                                mouseout:      iEvent.toElement,
+                                mouseenter:    iEvent.fromElement || iEvent.toElement,
+                                mouseleave:    iEvent.toElement || iEvent.fromElement
+                            })[iEvent.type]
+                        }));
+
+                    if (iReturn === false) {
+                        iEvent.preventDefault();
+                        iEvent.stopPropagation();
+                    }
                 };
         }
     }
@@ -738,7 +735,6 @@
         _Operator_('Data', [iElement], 'event', Event_Data);
     }
 
-
     /* ----- DOM Ready ----- */
     _Operator_('Data', [DOM], 'event', {
         ready:    [ ],
@@ -779,7 +775,7 @@
 
 
 
-/* ----- DOM Constructor ----- */
+/* ---------- DOM Constructor ---------- */
     function DOM_Create(TagName, AttrList) {
         var iNew;
 
@@ -813,7 +809,7 @@
                     case 'html':
                         iNew.innerHTML = iValue;  break;
                     case 'style':    if (_Type_(iValue) == 'Object') {
-                        _Type_(iNew, iValue);
+                        _Operator_('Style', [iNew], iValue);
                         break;
                     }
                     default:         {
@@ -830,7 +826,60 @@
     }
 
 
-/* ----- AJAX Module ----- */
+/* ---------- DOM Selector ---------- */
+    var iPseudo = {
+            ':visible':    {
+                attribute:    {
+                    display:       'none',
+                    visibility:    'hidden',
+                    width:         0,
+                    height:        0,
+                    opacity:       0
+                },
+                filter:       function (iElement) {
+                    var iStyle = _Operator_('Style', [iElement], [
+                            'display',  'visibility',  'width',  'height',  'opacity'
+                        ]);
+
+                    for (var iKey in iStyle)
+                        if (iStyle[iKey] === this.attribute[iKey])
+                            return false;
+                    return true;
+                }
+            }
+        };
+
+    _Each_(iPseudo,  function (iKey) {
+        this.regexp = BOM.iRegExp('(.*?)' + iKey + "[>\\+~\\s]*(.*)",  undefined,  null);
+    });
+
+    function DOM_Search(iRoot, iSelector) {
+        try {
+            return  _Extend_([ ],  iRoot.querySelectorAll(iSelector || '*'));
+        } catch (iError) {
+            var _Selector_;
+            for (var _Pseudo_ in iPseudo) {
+                _Selector_ = iSelector.match(iPseudo[_Pseudo_].regexp);
+                if (_Selector_.length > 1)  break;
+            }
+            var Set_0 = arguments.callee(iRoot, _Selector_[1]),
+                Set_1 = [ ];
+            for (var i = 0;  i < Set_0.length;  i++)
+                if ( iPseudo[_Pseudo_].filter(Set_0[i]) ) {
+                    if (_Selector_[2])
+                        Set_1 = Set_1.concat( arguments.callee(Set_0[i], _Selector_[2]) );
+                    else
+                        Set_1.push(Set_0[i]);
+                }
+            for (var i = Set_1.length - 1;  i > 0;  i--)
+                if (Set_1.indexOf(Set_1[i]) < i)
+                    Set_1[i] = null;
+                
+            return Set_1;
+        }
+    }
+
+/* ---------- XML Module ---------- */
     if (_Browser_.msie < 9)
         var IE_DOMParser = (function (MS_Version) {
                 for (var i = 0; i < MS_Version.length; i++)  try {
@@ -873,76 +922,6 @@
         return iXML;
     }
 
-    function X_Domain(Target_URL) {
-        var iLocation = BOM.location;
-        Target_URL = Target_URL.match(/^(\w+?(s)?:)?\/\/([\w\d:]+@)?([^\/\:\@]+)(:(\d+))?/);
-
-        if (! Target_URL)  return false;
-        if (Target_URL[1] && (Target_URL[1] != iLocation.protocol))  return true;
-        if (Target_URL[4] && (Target_URL[4] != iLocation.hostname))  return true;
-        var iPort = iLocation.port || (
-                (iLocation.protocol == 'http:') && 80
-            ) || (
-                (iLocation.protocol == 'https:') && 443
-            );
-        if (Target_URL[6] && (Target_URL[6] != iPort))  return true;
-    }
-
-    function iAJAX(This_Call, X_Domain) {
-        var iXDR = (X_Domain && (_Browser_.msie < 10));
-        var iXHR = new BOM[iXDR ? 'XDomainRequest' : 'XMLHttpRequest']();
-
-        var _Open_ = iXHR.open;
-        iXHR.open = function () {
-            var _This_ = this;
-
-            _This_[
-                X_Domain ? 'onload' : 'onreadystatechange'
-            ] = function () {
-                if (! (X_Domain || (_This_.readyState == 4)))  return;
-
-                if (typeof iXHR.onready == 'function')
-                    iXHR.onready.call(iXHR, iXHR.responseAny());
-                iXHR = null;
-            };
-            _Open_.apply(_This_, arguments);
-        };
-        if (iXDR)
-            iXHR.setRequestHeader = function () {
-                console.warn("IE 8/9 XDR doesn't support Changing HTTP Headers...");
-            };
-
-        return  _Extend_(iXHR, {
-                responseAny:    function () {
-                    var iResponse = this.responseText.trim();
-
-                    try {
-                        iResponse = BOM.JSON.parseAll(iResponse);
-                    } catch (iError) {
-                        try {
-                            iResponse = XML_Parse(iResponse);
-                        } catch (iError) { }
-                    }
-
-                    return iResponse;
-                },
-                timeOut:        function (TimeOut_Seconds, TimeOut_Callback) {
-                    var iXHR = this;
-
-                    _Time_.wait(TimeOut_Seconds, function () {
-                        iXHR.onreadystatechange = null;
-                        iXHR.abort();
-                        TimeOut_Callback.call(iXHR);
-                    });
-                },
-                retry:    function (Wait_Seconds) {
-                    _Time_.wait(Wait_Seconds, function () {
-                        This_Call.callee.apply(BOM, This_Call);
-                    });
-                }
-            });
-    }
-
 
 /* ---------- jQuery API ---------- */
     BOM.iQuery = function () {
@@ -961,13 +940,11 @@
 
         if (! iArgs[0]) return;
 
-        if (_Type_(iArgs[0]) == 'String') {
+        if (typeof iArgs[0] == 'string') {
             if ((iArgs[0][0] != '<') && (_Type_(iArgs[1]) != 'Object')) {
                 this.context = iArgs[1] || this.context;
                 try {
-                    this.add(
-                        this.context.querySelectorAll(iArgs[0])
-                    );
+                    this.add( DOM_Search(this.context, iArgs[0]) );
                 } catch (iError) { }
                 this.selector = iArgs[0];
             } else
@@ -983,7 +960,6 @@
         BOM.jQuery = BOM.iQuery;
         BOM.$ = $;
     }
-
 
     /* ----- iQuery Static Method ----- */
     _Extend_($, {
@@ -1082,9 +1058,77 @@
 
     _Extend_($, _Time_);
 
-
-
     /* ----- HTTP Client ----- */
+    function X_Domain(Target_URL) {
+        var iLocation = BOM.location;
+        Target_URL = Target_URL.match(/^(\w+?(s)?:)?\/\/([\w\d:]+@)?([^\/\:\@]+)(:(\d+))?/);
+
+        if (! Target_URL)  return false;
+        if (Target_URL[1] && (Target_URL[1] != iLocation.protocol))  return true;
+        if (Target_URL[4] && (Target_URL[4] != iLocation.hostname))  return true;
+        var iPort = iLocation.port || (
+                (iLocation.protocol == 'http:') && 80
+            ) || (
+                (iLocation.protocol == 'https:') && 443
+            );
+        if (Target_URL[6] && (Target_URL[6] != iPort))  return true;
+    }
+
+    function iAJAX(This_Call, X_Domain) {
+        var iXDR = (X_Domain && (_Browser_.msie < 10));
+        var iXHR = new BOM[iXDR ? 'XDomainRequest' : 'XMLHttpRequest']();
+
+        var _Open_ = iXHR.open;
+        iXHR.open = function () {
+            var _This_ = this;
+
+            _This_[
+                X_Domain ? 'onload' : 'onreadystatechange'
+            ] = function () {
+                if (! (X_Domain || (_This_.readyState == 4)))  return;
+
+                if (typeof iXHR.onready == 'function')
+                    iXHR.onready.call(iXHR, iXHR.responseAny());
+                iXHR = null;
+            };
+            _Open_.apply(_This_, arguments);
+        };
+        if (iXDR)
+            iXHR.setRequestHeader = function () {
+                console.warn("IE 8/9 XDR doesn't support Changing HTTP Headers...");
+            };
+
+        return  _Extend_(iXHR, {
+                responseAny:    function () {
+                    var iResponse = this.responseText.trim();
+
+                    try {
+                        iResponse = BOM.JSON.parseAll(iResponse);
+                    } catch (iError) {
+                        try {
+                            iResponse = XML_Parse(iResponse);
+                        } catch (iError) { }
+                    }
+
+                    return iResponse;
+                },
+                timeOut:        function (TimeOut_Seconds, TimeOut_Callback) {
+                    var iXHR = this;
+
+                    _Time_.wait(TimeOut_Seconds, function () {
+                        iXHR.onreadystatechange = null;
+                        iXHR.abort();
+                        TimeOut_Callback.call(iXHR);
+                    });
+                },
+                retry:    function (Wait_Seconds) {
+                    _Time_.wait(Wait_Seconds, function () {
+                        This_Call.callee.apply(BOM, This_Call);
+                    });
+                }
+            });
+    }
+
     function iHTTP(iURL, iData, iCallback) {
         var HTTP_Client = iAJAX(arguments, X_Domain(iURL));
 
@@ -1092,7 +1136,6 @@
         HTTP_Client.open(iData ? 'POST' : 'GET', iURL, true);
         if (iData)
             HTTP_Client.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-//        HTTP_Client.setRequestHeader('If-Modified-Since', 0);
         HTTP_Client.send(
             (typeof iData == 'string') ?
                 iData : BOM.encodeURI( $.param(iData || { }) )
@@ -1129,8 +1172,8 @@
                 iArgs[0] = $(iArgs[0], iArgs[1]);
                 iArgType = 'iQuery';
             } else if (
-                (typeof iArgs[0].length == 'number') &&
-                (! ($.type(iArgs[0]) in Type_Info.DOM.element))
+                ($.type(iArgs[0].length) == 'Number') &&
+                (! (iArgType in Type_Info.DOM.element))
             )
                 iArgType = 'Array';
 
@@ -1193,18 +1236,13 @@
         },
         filter:         function (iSelector) {
             var $_Filter = $(iSelector),
-                iVisible = iSelector && iSelector.trim().match(/(\s?):visible$/),
                 $_Result = [ ];
 
-            if (iVisible)  iVisible = iVisible[1] ? 2 : 1;
-
-            if ( $_Filter.length )
+            if ( $_Filter.length ) {
                 for (var i = 0;  i < this.length;  i++)
-                    if ($.inArray($_Filter, this[i]) > -1) {
-                        if (iVisible && (! is_Visible(this[i])))
-                            continue;
+                    if ($.inArray($_Filter, this[i]) > -1)
                         $_Result.push( this[i] );
-                    }
+            }
 
             return  $.extend($($_Result), {prevObject:  this});
         },
@@ -1465,7 +1503,7 @@
             return  this;
         },
         on:             function (iType, iFilter, iCallback) {
-            if ($.type(iFilter) != 'String')
+            if (typeof iFilter != 'string')
                 return  this.bind.apply(this, arguments);
             else
                 return  this.bind(iType, function () {
@@ -1681,39 +1719,53 @@
             $.fn[iName] = Event_Method(iName);
     }
 
-
     /* ----- Touch Events ----- */
     $.extend($.fn, {
         swipe:    function (iCallback) {
             var Touch_Start;
 
-            this.bind('touchstart MSPointerDown',  function (iEvent) {
-                try {
-                    var iTouch = iEvent.changedTouches[0];
-                } catch (iError) {
-                    var iTouch = iEvent.touches[0];
-                }
+            this.bind(
+                $.browser.mobile ? 'touchstart MSPointerDown' : 'mousedown',
+                function (iTouch) {
+                    if ($.browser.mobile) {
+                        try {
+                            iTouch = iTouch.changedTouches[0];
+                        } catch (iError) {
+                            iTouch = iTouch.touches[0];
+                        }
+                    }
 
-                Touch_Start = {
-                    pX:    iTouch.pageX,
-                    pY:    iTouch.pageY
-                };
-            }).bind('touchmove MSPointerEnd',  function () {
-                arguments[0].preventDefault();
-            }).bind('touchend touchcancel MSPointerUp',  function (iEvent) {
-                try {
-                    var iTouch = iEvent.changedTouches[0];
-                } catch (iError) {
-                    var iTouch = iEvent.touches[0];
-                }
-                var iSwipe = {
-                        swipeLeft:    Touch_Start.pX - iTouch.pageX,
-                        swipeTop:     Touch_Start.pY - iTouch.pageY
+                    Touch_Start = {
+                        pX:    iTouch.pageX,
+                        pY:    iTouch.pageY
                     };
+                }
+            ).bind(
+                $.browser.mobile ? 'touchmove MSPointerEnd' : 'mousemove',
+                function () {
+                    arguments[0].preventDefault();
+                }
+            ).bind(
+                $.browser.mobile ? 'touchend touchcancel MSPointerUp' : 'mouseup',
+                function (iEvent) {
+                    var iTouch = iEvent;
 
-                if (Math.max(Math.abs(iSwipe.swipeLeft), Math.abs(iSwipe.swipeTop)) > 20)
-                    iCallback.call(this,  $.extend(iEvent, iSwipe));
-            });
+                    if ($.browser.mobile)
+                        try {
+                            iTouch = iTouch.changedTouches[0];
+                        } catch (iError) {
+                            iTouch = iTouch.touches[0];
+                        }
+
+                    var iSwipe = {
+                            swipeLeft:    Touch_Start.pX - iTouch.pageX,
+                            swipeTop:     Touch_Start.pY - iTouch.pageY
+                        };
+
+                    if (Math.max(Math.abs(iSwipe.swipeLeft), Math.abs(iSwipe.swipeTop)) > 20)
+                        iCallback.call(this,  $.extend(iEvent, iSwipe));
+                }
+            );
         }
     });
 
@@ -1979,9 +2031,8 @@
     function Set_zIndex() {
         var $_This = $(this),  _Index_ = 0;
 
-        $_This.siblings().addBack().each(function () {
-            if ( is_Visible(this) )
-                _Index_ = Math.max(_Index_, Get_zIndex( $(this) ));
+        $_This.siblings().addBack().filter(':visible').each(function () {
+            _Index_ = Math.max(_Index_, Get_zIndex( $(this) ));
         });
         $_This.css('z-index', ++_Index_);
     }
@@ -2001,7 +2052,7 @@
         var iArgs = $.makeArray(arguments);
         var $_Form = this.is('form') ? this : this.find('form').eq(0),
             iAttribute = $.isPlainObject(iArgs[0]) ? iArgs.shift() : { },
-            iCallback = ($.type(iArgs[0]) == 'Function') ? iArgs.shift() : null;
+            iCallback = (typeof iArgs[0] == 'function') ? iArgs.shift() : null;
 
         var iTarget = $_Form.attr('target'),
             $_iFrame = [ ];
@@ -2081,10 +2132,6 @@
         return $_This;
     };
 
-    $.fn.stop = function () {
-        return  this.data('animate', 0);
-    };
-
     $.fx = {interval:  1000 / FPS};
 
     /* ----- CSS 3 Animation ----- */
@@ -2127,7 +2174,8 @@
 
         return  this.removeClass('animated').addClass(iClass);
     };
-    //  Animation ShortCut
+
+    /* ----- Animation ShortCut ----- */
     var CSS_Animation = [
             'fadeIn', 'fadeOut'
         ];
@@ -2140,6 +2188,10 @@
 
     for (var i = 0;  i < CSS_Animation.length;  i++)
         $.fn[ CSS_Animation[i] ] = iAnimate( CSS_Animation[i] );
+
+    $.fn.stop = function () {
+        return  this.data('animate', 0).removeClass('animated');
+    };
 
 })(self.iQuery);
 
@@ -2269,13 +2321,13 @@
     BOM.showModalDialog = function (iContent, iScale, CloseBack) {
         if (! arguments.length)
             throw 'A URL Argument is needed unless...';
-        if ($.type(iScale) == 'Function') {
+        if (typeof iScale == 'function') {
             CloseBack = iScale;
             iScale = null;
-        } else if ($.type(CloseBack) == 'String')
+        } else if (typeof CloseBack == 'string')
             return old_MD.apply(BOM, arguments);
 
-        if ($.type(iContent) == 'String') {
+        if (typeof iContent == 'string') {
             if (! iContent.match(/^(\w+:)?\/\/[\w\d\.:@]+/)) {
                 var iTitle = iContent;
                 iContent = 'about:blank';
