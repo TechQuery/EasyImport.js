@@ -712,7 +712,13 @@
     function DOM_Create(TagName, AttrList) {
         var iNew,  iTag = TagName.match(/<\s*\w+[^>]*>/g);
 
-        if (iTag.length > 1) {
+        if (! iTag)  return [
+                DOM.createTextNode(TagName)
+            ];
+
+        var iAttr = iTag.length && TagName.match(/<\s*\w+\s+\w+[^>]*>/g);
+
+        if ((iTag.length > 1) || iAttr) {
             iNew = _Get_Set_.innerHTML.set(
                 DOM.createElement('div'),  TagName
             );
@@ -2095,10 +2101,13 @@
             iEvent.stopPropagation();
             $_Button.attr('disabled', true);
 
-            $.post(this.action,  this,  function () {
+            if ( this.checkValidity() )
+                $.post(this.action,  this,  function () {
+                    $_Button.prop('disabled', false);
+                    iCallback.call($_Form[0], arguments[0]);
+                });
+            else
                 $_Button.prop('disabled', false);
-                iCallback.call($_Form[0], arguments[0]);
-            });
         });
         $_Button.prop('disabled', false);
 
@@ -2394,6 +2403,52 @@
     );
 
 })(self, self.document, self.iQuery);
+
+
+
+/* ---------- HTML 5 Form Shim ---------- */
+(function ($) {
+
+    function Value_Check() {
+        var $_This = $(this);
+
+        if ($.isData( $_This.attr('required') )  &&  (! this.value))
+            return false;
+
+        var iRegEx = $_This.attr('pattern');
+        if ( $.isData(iRegEx) )  try {
+            return  RegExp(iRegEx).test(this.value);
+        } catch (iError) { }
+
+        if ((this.tagName.toLowerCase() == 'input')  &&  (this.type == 'number')) {
+            var iNumber = Number(this.value),
+                iMin = Number( $_This.attr('min') );
+            if (
+                isNaN(iNumber)  ||
+                (iNumber < iMin)  ||
+                (iNumber > Number( $_This.attr('max') ))  ||
+                ((iNumber - iMin)  %  Number( $_This.attr('step') ))
+            )
+                return false;
+        }
+
+        return true;
+    }
+
+    HTMLInputElement.prototype.checkValidity = Value_Check;
+    HTMLSelectElement.prototype.checkValidity = Value_Check;
+    HTMLTextAreaElement.prototype.checkValidity = Value_Check;
+
+    HTMLFormElement.prototype.checkValidity = function () {
+        var $_Input = $('*[name]:input', this);
+
+        for (var i = 0;  i < $_Input.length;  i++)
+            if (! $_Input[i].checkValidity())
+                return false;
+        return true;
+    };
+
+})(self.iQuery);
 
 
 
@@ -3018,7 +3073,7 @@
     function Load_End() {
         if ( Load_Times++ )  return;
 
-        var iTimer = $.browser.modern && BOM.performance.timing;
+        var iTimer = $.browser.modern  &&  (BOM.performance || { }).timing;
 
         var Async_Time = (! iTimer) ? $.end('DOM_Ready') : (
                 (iTimer.domContentLoadedEventEnd - iTimer.navigationStart) / 1000
