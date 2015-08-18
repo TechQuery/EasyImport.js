@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-8-10)  Stable
+//      [Version]    v1.0  (2015-8-18)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -20,7 +20,7 @@
             var iString = [ ];
 
             for (var i = 0;  i < arguments;  i++)
-                iString.push( arguments[i].toString() );
+                iString.push( String(arguments[i]) );
 
             BOM.status = iString.join(' ');
         }
@@ -85,6 +85,26 @@
         return iName.join('');
     };
 
+    String.prototype.toHyphenCase = function () {
+        var iString = [ ];
+
+        for (var i = 0;  i < this.length;  i++)  switch (true) {
+            case ((this[i] >= 'A')  &&  (this[i] < 'a')):    {
+                iString.push('-');
+                iString.push( this[i].toLowerCase() );
+                break;
+            }
+            case ((this[i] < '0')  ||  (this[i] > 'z')):     {
+                iString.push('-');
+                break;
+            }
+            default:
+                iString.push( this[i] );
+        }
+
+        return iString.join('');
+    };
+
 
     if (! [ ].indexOf)
         Array.prototype.indexOf = function () {
@@ -129,7 +149,7 @@
             if (_Window_ && (this.location.href == 'about:blank'))
                 This_DOM.domain = _Window_.document.domain;
 
-            if (! (_Window_ || this).$.browser.modern)
+            if (! (_Window_ || this).navigator.userAgent.match(/MSIE 8/i))
                 This_DOM.head = This_DOM.documentElement.firstChild;
         } catch (iError) {
             return false;
@@ -146,7 +166,7 @@
 
 
 
-// ---------->  iQuery.js  <---------- //
+/* ---------- iQuery Core & API ---------- */
 (function (BOM, DOM) {
 
 /* ---------- UA Check ---------- */
@@ -197,12 +217,20 @@
         return Arr_Obj;
     }
 
-    function _Extend_(iTarget) {
-        iTarget = iTarget || (
-            (arguments[1] instanceof Array)  ?  [ ]  :  { }
-        );
+    function _Extend_() {
+        var iTarget, iFirst;
 
-        for (var i = 1;  i < arguments.length;  i++)
+        if (arguments.length > 1) {
+            iTarget = arguments[0] || (
+                (arguments[1] instanceof Array)  ?  [ ]  :  { }
+            );
+            iFirst = 1;
+        } else {
+            iTarget = this;
+            iFirst = 0;
+        }
+
+        for (var i = iFirst;  i < arguments.length;  i++)
             for (var iKey in arguments[i])
                 if (
                     Object.prototype.hasOwnProperty.call(arguments[i], iKey)  &&
@@ -223,7 +251,7 @@
     }
 
     var Type_Info = {
-            Data:         _inKey_('String', 'Number', 'Boolean', 'Object', 'Null'),
+            Data:         _inKey_('String', 'Number', 'Boolean', 'Null'),
             BOM:          _inKey_('Window', 'DOMWindow', 'global'),
             DOM:          {
                 set:        _inKey_('Array', 'HTMLCollection', 'NodeList', 'jQuery', 'iQuery'),
@@ -296,7 +324,13 @@
         return iType;
     }
 
-    function Back_Track(iName, iCallback) {
+    function Empty_Object() {
+        for (var iKey in arguments[0])
+            return false;
+        return true;
+    }
+
+    function Object_Seek(iName, iCallback) {
         var iResult = [ ];
 
         for (var _This_ = this, _Next_, i = 0;  _This_[iName];  _This_ = _Next_, i++) {
@@ -390,7 +424,7 @@
 
     _Get_Set_.innerHTML = {
         set:    function (iElement, iHTML) {
-            var IE_Scope = iHTML.toString().match(
+            var IE_Scope = String(iHTML).match(
                     /^[^<]*<\s*(head|meta|title|link|style|script|noscript|(!--[^>]*--))[^>]*>/i
                 );
 
@@ -409,28 +443,7 @@
     }
 
     /* ----- DOM Style ----- */
-    var IE_CSS_Filter = (! _Browser_.modern),
-        Code_Indent = (_Browser_.modern  ?  ''  :  ' '.repeat(4));
-
-    function toHexInt(iDec, iLength) {
-        var iHex = parseInt( Number(iDec).toFixed(0) ).toString(16);
-
-        if (iLength && (iLength > iHex.length))
-            iHex = '0'.repeat(iLength - iHex.length) + iHex;
-
-        return iHex;
-    }
-
-    function RGB_Hex(iRed, iGreen, iBlue) {
-        var iArgs = _Extend_([ ], arguments);
-
-        if ((iArgs.length == 1) && (typeof iArgs[0] == 'string'))
-            iArgs = iArgs[0].replace(/rgb\(([^\)]+)\)/i, '$1').replace(/,\s*/g, ',').split(',');
-
-        for (var i = 0; i < 3; i++)
-            iArgs[i] = toHexInt(iArgs[i], 2);
-        return iArgs.join('');
-    }
+    var Code_Indent = _Browser_.modern ? '' : ' '.repeat(4);
 
     _Get_Set_.Style = {
         PX_Needed:    _inKey_(
@@ -444,112 +457,45 @@
             if ((! iElement) || (_Type_(iElement) in Type_Info.DOM.root))
                 return null;
 
-            var iScale = 1;
-
-            if (IE_CSS_Filter)
-                switch (iName) {
-                    case 'opacity':    {
-                        iName = 'filter';
-                        iScale = 100;
-                    }
-                }
-
-            var iStyle = IE_CSS_Filter ?
-                    iElement.currentStyle.getAttribute(iName) :
-                    DOM.defaultView.getComputedStyle(iElement, null).getPropertyValue(iName);
-
-            if ((_Type_(iStyle) == 'Number') || (! iStyle))
-                return iStyle;
-
+            var iStyle = DOM.defaultView.getComputedStyle(iElement, null).getPropertyValue(iName);
             var iNumber = parseFloat(iStyle);
 
-            return  isNaN(iNumber) ? iStyle : (iNumber / iScale);
+            return  isNaN(iNumber) ? iStyle : iNumber;
         },
         set:          function (iElement, iName, iValue) {
             if (_Type_(iElement) in Type_Info.DOM.root)  return false;
 
-            if (IE_CSS_Filter) {
-                var iString = '',  iWrapper,  iScale = 1,  iConvert;
-                if (typeof iValue == 'string')
-                    var iRGBA = iValue.match(/\s*rgba\(([^\)]+),\s*(\d\.\d+)\)/i);
-
-                if (iName == 'opacity') {
-                    iName = 'filter';
-                    iWrapper = 'progid:DXImageTransform.Microsoft.Alpha(opacity={n})';
-                    iScale = 100;
-                } else if (!! iRGBA) {
-                    iString = iValue.replace(iRGBA[0], '');
-                    if (iString)
-                        iString += arguments.callee(arguments[0], iName, iString);
-                    if (iName != 'background')
-                        iString += arguments.callee(
-                            arguments[0],
-                            (iName.indexOf('-color') > -1) ? iName : (iName + '-color'),
-                            'rgb(' + iRGBA[1] + ')'
-                        );
-                    iName = 'filter';
-                    iWrapper = 'progid:DXImageTransform.Microsoft.Gradient(startColorStr=#{n},endColorStr=#{n})';
-                    iConvert = function (iAlpha, iRGB) {
-                        return  toHexInt(parseFloat(iAlpha) * 256, 2) + RGB_Hex(iRGB);
-                    };
-                }
-            }
-
             if ((! isNaN( Number(iValue) ))  &&  this.PX_Needed[iName])
                 iValue += 'px';
-            if (iWrapper)
-                iValue = iWrapper.replace(/\{n\}/g,  iConvert ?
-                      iConvert(iRGBA[2], iRGBA[1]) :
-                      (iValue * iScale)
-                );
 
             if (iElement)
-                iElement.style[
-                    IE_CSS_Filter ? 'setAttribute' : 'setProperty'
-                ](
-                    iName,
-                    (_Browser_.msie != 9) ? iValue : iValue.toString(),
-                    'important'
-                );
-            else  return [
-                    iString ? (iString + ";\n") : ''
-                ].concat([
-                    iName,  ':',  Code_Indent,  iValue
-                ]).join('');
+                iElement.style.setProperty(iName, String(iValue), 'important');
+            else
+                return  [iName, ':', Code_Indent, iValue].join('');
         }
     };
 
     /* ----- DOM Attribute ----- */
     _Get_Set_.Attribute = {
-        alias:    {
-            'class':    'className',
-            'for':      'htmlFor'
-        },
         get:      function (iElement, iName) {
             return  (_Type_(iElement) in Type_Info.DOM.root) ?
-                    null : iElement.getAttribute(
-                        _Browser_.modern  ?  iName  :  (this.alias[iName] || iName)
-                    );
+                    null : iElement.getAttribute(iName);
         },
         set:      function (iElement, iName, iValue) {
-            if (_Type_(iElement) in Type_Info.DOM.root)
-                return false;
-
-            if ((! _Browser_.modern) && this.alias[iName])
-                iElement[ this.alias[iName] ] = iValue;
-            else
-                iElement.setAttribute(iName, iValue);
+            return  (_Type_(iElement) in Type_Info.DOM.root) ?
+                    false  :  iElement.setAttribute(iName, iValue);
         },
         clear:    function (iElement, iName) {
-            iElement.removeAttribute(
-                _Browser_.modern  ?  iName  :  (this.alias[iName] || iName)
-            );
+            iElement.removeAttribute(iName);
         }
     };
 
     /* ----- DOM Property ----- */
     _Get_Set_.Property = {
-        alias:    _Get_Set_.Attribute.alias,
+        alias:    {
+            'class':    'className',
+            'for':      'htmlFor'
+        },
         get:      function (iElement, iName) {
             return  iElement[
                     _Browser_.modern  ?  iName  :  (this.alias[iName] || iName)
@@ -600,7 +546,7 @@
                 top:     this[0].offsetTop
             };
 
-        Back_Track.call('offsetParent', function () {
+        Object_Seek.call(this[0], 'offsetParent', function () {
             iOffset.left += this.offsetLeft;
             iOffset.top += this.offsetTop;
         });
@@ -710,7 +656,7 @@
         var _GUID_ = _Time_.guid('parent');
 
         for (var i = 0;  i < this.length;  i++)
-            Back_Track.call(this[i],  'parentNode',  function () {
+            Object_Seek.call(this[i],  'parentNode',  function () {
                 _Operator_('Attribute',  [this],  _GUID_,  function (_Index_, iTimes) {
                     return  iTimes ? (parseInt(iTimes) + 1) : 1
                 });
@@ -806,6 +752,11 @@
                 filter:     function () {
                     return  (arguments[0].tagName.toLowerCase() in this.feature);
                 }
+            },
+            ':data':       {
+                filter:    function () {
+                    return  (! Empty_Object(arguments[0].dataset));
+                }
             }
         };
 
@@ -874,50 +825,6 @@
     }
 
 
-/* ---------- XML Module ---------- */
-    if (_Browser_.msie < 9)
-        var IE_DOMParser = (function (MS_Version) {
-                for (var i = 0; i < MS_Version.length; i++)  try {
-                    new ActiveXObject( MS_Version[i] );
-                    return MS_Version[i];
-                } catch (iError) { }
-            })([
-                'MSXML2.DOMDocument.6.0',
-                'MSXML2.DOMDocument.5.0',
-                'MSXML2.DOMDocument.4.0',
-                'MSXML2.DOMDocument.3.0',
-                'MSXML2.DOMDocument',
-                'Microsoft.XMLDOM'
-            ]);
-
-    function XML_Parse(iString) {
-        iString = iString.trim();
-        if ((iString[0] != '<') || (iString[iString.length - 1] != '>'))
-            throw 'Illegal XML Format...';
-
-        var iXML;
-
-        if (DOMParser) {
-            iXML = (new DOMParser()).parseFromString(iString, 'text/xml');
-            var iError = iXML.getElementsByTagName('parsererror');
-            if (iError.length) {
-                throw  new SyntaxError(1, 'Incorrect XML Syntax !');
-                console.log(iError[0]);
-            }
-            iXML.cookie;    //  for old WebKit core to throw Error
-        } else {
-            iXML = new ActiveXObject( IE_DOMParser );
-            iXML.async = false;
-            iXML.loadXML(iString);
-            if (iXML.parseError.errorCode) {
-                throw  new SyntaxError(iXML.parseError, 'Incorrect XML Syntax !');
-                console.log(iXML.parseError.reason);
-            }
-        }
-        return iXML;
-    }
-
-
 /* ---------- jQuery API ---------- */
     BOM.iQuery = function (Element_Set, iContext) {
         /* ----- Global Wrapper ----- */
@@ -978,24 +885,21 @@
     }
 
     /* ----- iQuery Static Method ----- */
-    _Extend_($, {
+    $.extend = _Extend_;
+
+    $.extend($, _Time_, {
         browser:          _Browser_,
         type:             _Type_,
         isPlainObject:    function (iValue) {
             return  iValue && (iValue.constructor === Object);
         },
-        isEmptyObject:    function () {
-            for (var iKey in arguments[0])
-                return false;
-            return true;
-        },
+        isEmptyObject:    Empty_Object,
         isData:           function () {
             return  (this.type(arguments[0]) in Type_Info.Data);
         },
         each:             _Each_,
-        extend:           _Extend_,
         makeArray:        function () {
-            return  this.extend([ ], arguments[0]);
+            return  $.extend([ ], arguments[0]);
         },
         inArray:          function () {
             return  Array.prototype.indexOf.call(arguments[0], arguments[1]);
@@ -1014,7 +918,21 @@
             return iString;
         },
         parseJSON:        BOM.JSON.parse,
-        parseXML:         XML_Parse,
+        parseXML:         function (iString) {
+            iString = iString.trim();
+            if ((iString[0] != '<') || (iString[iString.length - 1] != '>'))
+                throw 'Illegal XML Format...';
+
+            var iXML = (new BOM.DOMParser()).parseFromString(iString, 'text/xml');
+            var iError = iXML.getElementsByTagName('parsererror');
+            if (iError.length) {
+                throw  new SyntaxError(1, 'Incorrect XML Syntax !');
+                console.log(iError[0]);
+            }
+            iXML.cookie;    //  for old WebKit core to throw Error
+
+            return iXML;
+        },
         param:            function (iObject) {
             var iParameter = [ ],  iValue;
 
@@ -1029,7 +947,7 @@
 
                     iParameter.push(iName + '=' + BOM.encodeURIComponent(iValue));
                 }
-            else if (iObject instanceof $)
+            else if ($.type(iObject) in Type_Info.DOM.set)
                 for (var i = 0;  i < iObject.length;  i++)
                     iParameter.push(
                         iObject[i].name + '=' + BOM.encodeURIComponent(iObject[i].value)
@@ -1077,10 +995,10 @@
         }
     });
 
-    _Extend_($, _Time_);
-
     /* ----- iQuery Instance Method ----- */
-    _Extend_($.fn, {
+    $.fn.extend = $.extend;
+
+    $.fn.extend({
         splice:             Array.prototype.splice,
         jquery:             '1.9.1',
         iquery:             '1.0',
@@ -1094,9 +1012,9 @@
         },
         index:              function (iTarget) {
             if (! iTarget)
-                return  Back_Track.call(
+                return  Object_Seek.call(
                         this[0],
-                        ($.browser.msie < 9) ? 'previousSibling' : 'previousElementSibling'
+                        $.browser.modern ? 'previousElementSibling' : 'previousSibling'
                     ).length;
 
             var iType = $.type(iTarget);
@@ -1185,17 +1103,15 @@
                 if ($.inArray($_Result, this[i].parentNode) == -1)
                     $_Result.push( this[i].parentNode );
 
-            $_Result = $($_Result);
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
 
             return this.pushStack($_Result);
         },
         parents:            function () {
             var _GUID_ = _Parents_.call(this);
             var $_Result = $('*[' + _GUID_ + ']').removeAttr(_GUID_);
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
+
+            if (arguments[0])  $_Result = $_Result.filter(arguments[0]);
 
             return  this.pushStack( Array.prototype.reverse.call($_Result) );
         },
@@ -1206,8 +1122,7 @@
             var $_Result = $(['*[', _GUID_, '="', iTimes, '"]'].join(''))
                     .removeAttr(_GUID_);
 
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
+            if (arguments[0])  $_Result = $_Result.filter(arguments[0]);
 
             return  this.pushStack( Array.prototype.reverse.call($_Result) );
         },
@@ -1222,9 +1137,7 @@
             for (var i = 0;  i < this.length;  i++)
                 $_Result = _Concat_($_Result, this[i].children);
 
-            $_Result = $($_Result);
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
 
             return this.pushStack($_Result);
         },
@@ -1245,18 +1158,36 @@
 
             return this.pushStack($_Result);
         },
+        nextAll:            function () {
+            var $_Result = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                $_Result = _Concat_($_Result, Object_Seek.call(
+                    this[i],
+                    $.browser.modern ? 'nextElementSibling' : 'nextSibling'
+                ));
+
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
+
+            return this.pushStack($_Result);
+        },
+        prevAll:            function () {
+            var $_Result = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                $_Result = _Concat_($_Result, Object_Seek.call(
+                    this[i],
+                    $.browser.modern ? 'previousElementSibling' : 'previousSibling'
+                ));
+
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
+
+            return this.pushStack($_Result);
+        },
         siblings:           function () {
-            var _GUID_ = $.guid();
-            var $_This = this.prop('iQuery_ID', _GUID_);
+            var $_Result = this.prevAll().add( this.nextAll() );
 
-            var $_Result = this.parent().children();
-            for (var i = 0;  i < $_Result.length;  i++)
-                if ($_Result[i].iQuery_ID == _GUID_)
-                    $_Result[i] = $_Result[i].iQuery_ID = null;
-
-            $_Result = $( $.makeArray($_Result) );
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
+            if (arguments[0])  $_Result = $_Result.filter(arguments[0]);
 
             return this.pushStack($_Result);
         },
@@ -1506,7 +1437,7 @@
             iHandler = iHandler && iHandler[arguments[0]];
             if (! iHandler)  return;
 
-            var iArgs = $.extend([ ], arguments),  iReturn;
+            var iArgs = $.makeArray(arguments),  iReturn;
             iArgs.unshift([ ]);
             for (var i = 0;  i < iHandler.length;  i++)
                 iReturn = iHandler[i].apply(
@@ -1581,6 +1512,9 @@
             else
                 return  this.attr('value', arguments[0]);
         },
+        serialize:          function () {
+            return $.param(this);
+        },
         serializeArray:     function () {
             var $_Value = this.find('*[name]').not(':button, [disabled]'),
                 iValue = [ ];
@@ -1653,7 +1587,14 @@
                 iResource.count++ ;
                 console.log(this);
             }  break;
-            case 'input':    iReturn = $_This.attr('value', iValue);  break;
+            case 'textarea':    ;
+            case 'select':      ;
+            case 'input':       {
+                if ($_This.attr('type').match(/radio|checkbox/i) && iValue)
+                    $_This.prop('checked', true);
+                iReturn = $_This.attr('value', iValue);
+                break;
+            }
             default:         {
                 var _Set_ = iValue || $.isData(iValue),
                     End_Element = (! this.children.length),
@@ -1858,11 +1799,195 @@
 
 
 
-/* ---------- W3C Event Shim ---------- */
+/* ---------- W3C HTML 5  Shim ---------- */
 (function (BOM, DOM, $) {
 
-    if ( $.browser.modern )  return;
+    if (! ($.browser.msie < 10))  return;
 
+    /* ----- Element Data Set ----- */
+    function DOMStringMap(iElement) {
+        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
+            iAttr = iElement.attributes[i];
+            if (iAttr.nodeName.slice(0, 5) == 'data-')
+                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
+        }
+    }
+
+    Object.defineProperty(Element.prototype, 'dataset', {
+        get:    function () {
+            return  new DOMStringMap(this);
+        },
+        set:    function () { }
+    });
+
+
+    /* ----- History API ----- */
+    var _State_ = [
+            [null, DOM.title, DOM.URL]
+        ],
+        _Pushing_ = false,
+        $_BOM = $(BOM);
+
+    BOM.history.pushState = function (iState, iTitle, iURL) {
+        for (var iKey in iState)
+            if (! $.isData(iState[iKey]))
+                throw ReferenceError("The History State can't be Complex Object !");
+
+        if (typeof iTitle != 'string')
+            throw TypeError("The History State needs a Title String !");
+
+        DOM.title = iTitle;
+        _Pushing_ = true;
+        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
+    };
+
+    BOM.history.replaceState = function () {
+        _State_ = [ ];
+        this.pushState.apply(this, arguments);
+    };
+
+    $_BOM.on('hashchange',  function () {
+        if (_Pushing_) {
+            _Pushing_ = false;
+            return;
+        }
+
+        var iState = _State_[ BOM.location.hash.slice(2) ];
+        if (! iState)  return;
+
+        BOM.history.state = iState[0];
+        DOM.title = iState[1];
+
+        $_BOM.trigger('popstate');
+    });
+
+
+    if ($.browser.modern)  return;
+
+    /* ----- DOM Attribute Name ----- */
+    var iAlias = {
+            'class':    'className',
+            'for':      'htmlFor'
+        },
+        Get_Attribute = Element.prototype.getAttribute,
+        Set_Attribute = Element.prototype.setAttribute,
+        Remove_Attribute = Element.prototype.removeAttribute;
+
+    $.extend(Element.prototype, {
+        getAttribute:    function (iName) {
+            return  Get_Attribute.call(this,  iAlias[iName] || iName);
+        },
+        setAttribute:    function (iName) {
+            return  Set_Attribute.call(this,  iAlias[iName] || iName,  arguments[1]);
+        },
+        removeAttribute:    function (iName) {
+            return  Remove_Attribute.call(this,  iAlias[iName] || iName);
+        }
+    });
+
+    /* ----- Computed Style ----- */
+    function CSSStyleDeclaration() {
+        $.extend(this, arguments[0].currentStyle, {
+            length:       0,
+            cssText:      '',
+            ownerNode:    arguments[0]
+        });
+
+        for (var iName in this) {
+            this[this.length++] = iName.toHyphenCase();
+            this.cssText += [
+                iName,  ': ',  this[iName],  '; '
+            ].join('');
+        }
+        this.cssText = this.cssText.trim();
+    }
+
+    var Code_Indent = ' '.repeat(4);
+
+    function toHexInt(iDec, iLength) {
+        var iHex = parseInt( Number(iDec).toFixed(0) ).toString(16);
+
+        if (iLength && (iLength > iHex.length))
+            iHex = '0'.repeat(iLength - iHex.length) + iHex;
+
+        return iHex;
+    }
+
+    function RGB_Hex(iRed, iGreen, iBlue) {
+        var iArgs = $.makeArray(arguments);
+
+        if ((iArgs.length == 1) && (typeof iArgs[0] == 'string'))
+            iArgs = iArgs[0].replace(/rgb\(([^\)]+)\)/i, '$1').replace(/,\s*/g, ',').split(',');
+
+        for (var i = 0;  i < 3;  i++)
+            iArgs[i] = toHexInt(iArgs[i], 2);
+        return iArgs.join('');
+    }
+
+    $.extend(CSSStyleDeclaration.prototype, {
+        getPropertyValue:    function (iName) {
+            var iScale = 1;
+
+            switch (iName) {
+                case 'opacity':    {
+                    iName = 'filter';
+                    iScale = 100;
+                }
+            }
+            var iStyle = this[ iName.toCamelCase() ];
+            var iNumber = parseFloat(iStyle);
+
+            return  isNaN(iNumber) ? iStyle : (iNumber / iScale);
+        },
+        setPropertyValue:    function (iName, iValue) {
+            this[this.length++] = iName;
+
+            var iString = '',  iWrapper,  iScale = 1,  iConvert;
+            if (typeof iValue == 'string')
+                var iRGBA = iValue.match(/\s*rgba\(([^\)]+),\s*(\d\.\d+)\)/i);
+
+            if (iName == 'opacity') {
+                iName = 'filter';
+                iWrapper = 'progid:DXImageTransform.Microsoft.Alpha(opacity={n})';
+                iScale = 100;
+            } else if (iRGBA) {
+                iString = iValue.replace(iRGBA[0], '');
+                if (iString)
+                    iString += arguments.callee.call(this, arguments[0], iName, iString);
+                if (iName != 'background')
+                    iString += arguments.callee.call(
+                        this,
+                        arguments[0],
+                        (iName.indexOf('-color') > -1) ? iName : (iName + '-color'),
+                        'rgb(' + iRGBA[1] + ')'
+                    );
+                iName = 'filter';
+                iWrapper = 'progid:DXImageTransform.Microsoft.Gradient(startColorStr=#{n},endColorStr=#{n})';
+                iConvert = function (iAlpha, iRGB) {
+                    return  toHexInt(parseFloat(iAlpha) * 256, 2) + RGB_Hex(iRGB);
+                };
+            }
+            if (iWrapper)
+                iValue = iWrapper.replace(/\{n\}/g,  iConvert ?
+                      iConvert(iRGBA[2], iRGBA[1]) :
+                      (iValue * iScale)
+                );
+
+            this[ this[this.length - 1].toCamelCase() ] = iValue + (arguments[2] ? ' !important' : '');
+
+            if (this.ownerNode)
+                this.ownerNode.style.setAttribute(iName,  iValue,  arguments[2] && 'important');
+            else
+                return  [iString, ";\n", iName, ':', Code_Indent, iValue].join('');
+        }
+    });
+
+    BOM.getComputedStyle = function () {
+        return  new CSSStyleDeclaration(arguments[0]);
+    };
+
+
+    /* ----- Event Object ----- */
     BOM.HTMLEvents = function (iEvent) {
         $.extend(this, DOM.createEventObject());
 
@@ -2036,6 +2161,45 @@
     $.extend(Element.prototype, IE_Event_Method);
     $.extend(DOM, IE_Event_Method);
     $.extend(BOM, IE_Event_Method);
+
+
+
+    /* ----- XML DOM Parser ----- */
+    var IE_DOMParser = (function (MS_Version) {
+            for (var i = 0; i < MS_Version.length; i++)  try {
+                new ActiveXObject( MS_Version[i] );
+                return MS_Version[i];
+            } catch (iError) { }
+        })([
+            'MSXML2.DOMDocument.6.0',
+            'MSXML2.DOMDocument.5.0',
+            'MSXML2.DOMDocument.4.0',
+            'MSXML2.DOMDocument.3.0',
+            'MSXML2.DOMDocument',
+            'Microsoft.XMLDOM'
+        ]);
+
+    function XML_Create() {
+        var iXML = new ActiveXObject(IE_DOMParser);
+        iXML.async = false;
+        iXML.loadXML(arguments[0]);
+        return iXML;
+    }
+
+    BOM.DOMParser = function () { };
+
+    BOM.DOMParser.prototype.parseFromString = function () {
+        var iXML = XML_Create(arguments[0]);
+
+        if (iXML.parseError.errorCode)
+            iXML = XML_Create([
+                '<xml><parsererror><h3>This page contains the following errors:</h3><div>',
+                iXML.parseError.reason,
+                '</div></parsererror></xml>'
+            ].join(''));
+
+        return iXML;
+    };
 
 })(self, self.document, self.iQuery);
 
@@ -2265,6 +2429,7 @@
 /* ---------- HTTP Client ---------- */
 (function (BOM, DOM, $) {
 
+    /* ----- XML HTTP Request ----- */
     function X_Domain(Target_URL) {
         var iLocation = BOM.location;
         Target_URL = Target_URL.match(/^(\w+?(s)?:)?\/\/([\w\d:]+@)?([^\/\:\@]+)(:(\d+))?/);
@@ -2306,7 +2471,12 @@
                             this.responseType = 'application/json';
                         } catch (iError) {
                             if ($.browser.msie != 9)  try {
-                                iContent = $.parseXML(_Content_);
+                                if (! $.browser.ff)
+                                    iContent = $.parseXML(_Content_);
+                                else if (this.responseXML)
+                                    iContent = this.responseXML;
+                                else
+                                    break;
                                 this.responseType = 'text/xml';
                             } catch (iError) { }
                         }
@@ -2326,7 +2496,6 @@
             }
         };
 
-    /* ----- XML HTTP Request ----- */
     var XHR_Open = BOM.XMLHttpRequest.prototype.open;
 
     $.extend(BOM.XMLHttpRequest.prototype, XHR_Extension, {
@@ -2400,7 +2569,7 @@
                     iDHR.responseText = $_Content.find('body').text();
                     iDHR.status = 200;
                     iDHR.readyState = 4;
-                    iDHR.onload.call($_Form[0],  iDHR.responseAny(),  $_Content);
+                    iDHR.onready.call($_Form[0],  iDHR.responseAny(),  $_Content);
                 } catch (iError) { }
             });
 
@@ -2421,7 +2590,7 @@
                     if (iDHR.readyState) {
                         iDHR.status = 200;
                         iDHR.readyState = 4;
-                        iDHR.onload.apply(iDHR, arguments);
+                        iDHR.onready.apply(iDHR, arguments);
                     }
                     delete this[_GUID_];
                     iDHR.$_DOM.remove();
@@ -2444,7 +2613,7 @@
     });
 
     /* ----- HTTP Wraped Method ----- */
-    function iHTTP(iURL, iData, iCallback) {
+    function iHTTP(iMethod, iURL, iData, iCallback) {
         var iXHR = BOM[
                 (X_Domain(iURL) && ($.browser.msie < 10))  ?  'XDomainRequest' : 'XMLHttpRequest'
             ];
@@ -2470,8 +2639,12 @@
             iData = BOM.encodeURI( $.param(iData || { }) );
 
         iXHR = new iXHR();
-        iXHR[$_Form ? 'onload' : 'onready'] = iCallback;
-        iXHR.open(iData ? 'POST' : 'GET',  $_Form || iURL,  true);
+        iXHR.onready = iCallback;
+        iXHR.open(
+            iMethod,
+            ((! iData) && $_Form)  ?  $_Form  :  iURL,
+            true
+        );
         iXHR.withCredentials = true;
         if (typeof iData == 'string')
             iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
@@ -2482,28 +2655,55 @@
         return iXHR;
     }
 
-    $.extend($, {
-        get:     function (iURL, iData, iCallback) {
+    function Idempotent_Args(iURL) {
+        iURL = iURL.split('?');
+        iURL[1] = $.extend($.paramJSON(iURL[1]), arguments[1]);
+
+        var iPrefetch;
+        $('link[rel="next"], link[rel="prefetch"]').each(function () {
+            if ($.fileName(this.href) == $.fileName(iURL[0]))
+                iPrefetch = true;
+        });
+        if (! iPrefetch)  iURL[1]._ = $.now();
+
+        return  (iURL[0] + '?' + $.param(iURL[1])).trim('?');
+    }
+
+    $.extend({
+        get:       function (iURL, iData, iCallback) {
             if (typeof iData == 'function') {
                 iCallback = iData;
                 iData = { };
             }
+            //  XHR
+            if (! iURL.match(/\w+=\?/))
+                return  iHTTP('GET',  Idempotent_Args(iURL, iData),  null,  iCallback);
 
-            if (! iURL.match(/\w+=\?/)) {
-                iURL = iURL.split('?');
-                return  iHTTP(iURL[0] + '?' + $.param(
-                        $.extend($.paramJSON(iURL[1]), iData, {
-                            _:    $.now()
-                        })
-                    ), null, iCallback);
-            }
             //  JSONP
             var iDHR = new BOM.DOMHttpRequest();
             iDHR.open('GET', iURL);
-            iDHR.onload = iCallback;
+            iDHR.onready = iCallback;
             return iDHR.send(iData);
         },
-        post:    iHTTP
+        post:      function () {
+            var iArgs = $.makeArray(arguments);
+            iArgs.unshift('POST');
+
+            return  iHTTP.apply(BOM, iArgs);
+        },
+        delete:    function (iURL, iData, iCallback) {
+            if (typeof iData == 'function') {
+                iCallback = iData;
+                iData = { };
+            }
+            return  iHTTP('DELETE',  Idempotent_Args(iURL, iData),  null,  iCallback);
+        },
+        put:       function () {
+            var iArgs = $.makeArray(arguments);
+            iArgs.unshift('PUT');
+
+            return  iHTTP.apply(BOM, iArgs);
+        }
     });
 
     $.getJSON = $.get;
@@ -2563,6 +2763,8 @@
         }
 
         function Load_Back(iHTML) {
+            if (typeof iHTML != 'string')  return;
+
             if (! iHTML.match(/<\s*(html|head|body)[^>]*>/i)) {
                 Append_Back.apply(this, arguments);
                 return;
@@ -2667,70 +2869,6 @@
 
 
 
-(function (BOM, DOM, $) {
-
-    if (! ($.browser.msie < 10))  return;
-
-/* ---------- HTML 5 Element Data Set  Shim ---------- */
-    function DOMStringMap(iElement) {
-        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
-            iAttr = iElement.attributes[i];
-            if (iAttr.nodeName.slice(0, 5) == 'data-')
-                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
-        }
-    }
-
-    Object.defineProperty(Element.prototype, 'dataset', {
-        get:    function () {
-            return  new DOMStringMap(this);
-        },
-        set:    function () { }
-    });
-
-/* ---------- History API Shim ---------- */
-    var _State_ = [
-            [null, DOM.title, DOM.URL]
-        ],
-        _Pushing_ = false,
-        $_BOM = $(BOM);
-
-    BOM.history.pushState = function (iState, iTitle, iURL) {
-        for (var iKey in iState)
-            if (! $.isData(iState[iKey]))
-                throw ReferenceError("The History State can't be Complex Object !");
-
-        if (typeof iTitle != 'string')
-            throw TypeError("The History State needs a Title String !");
-
-        DOM.title = iTitle;
-        _Pushing_ = true;
-        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
-    };
-
-    BOM.history.replaceState = function () {
-        _State_ = [ ];
-        this.pushState.apply(this, arguments);
-    };
-
-    $_BOM.on('hashchange',  function () {
-        if (_Pushing_) {
-            _Pushing_ = false;
-            return;
-        }
-
-        var iState = _State_[ BOM.location.hash.slice(2) ];
-        if (! iState)  return;
-
-        BOM.history.state = iState[0];
-        DOM.title = iState[1];
-
-        $_BOM.trigger('popstate');
-    });
-
-})(self, self.document, self.iQuery);
-
-
-
 /* ---------- Other Extension ---------- */
 (function (BOM, DOM, $) {
 
@@ -2746,8 +2884,7 @@
                     column:     iColumn  ||  (BOM.event && BOM.event.errorCharacter)  ||  0
                 };
 
-            if (iError && iError.stack)
-                iData.stack = (iError.stack || iError.stacktrace).toString();
+            if (iError)  iData.stack = String(iError.stack || iError.stacktrace);
 
             if (Console_URL) {
                 if (iData.stack)
@@ -3218,7 +3355,7 @@
     function Load_End() {
         if ( Load_Times++ )  return;
 
-        var iTimer = $.browser.modern  &&  (BOM.performance || { }).timing;
+        var iTimer = $.browser.modern && (! $.browser.ios) && BOM.performance.timing;
 
         var Async_Time = (! iTimer) ? $.end('DOM_Ready') : (
                 (iTimer.domContentLoadedEventEnd - iTimer.navigationStart) / 1000
