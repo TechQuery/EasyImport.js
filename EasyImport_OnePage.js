@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-8-21)  Stable
+//      [Version]    v1.0  (2015-8-24)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -1534,9 +1534,9 @@
         prepend:            function () {
             if (this.length) {
                 if (! this[0].children.length)
-                    $.fn.append.apply(this, arguments);
+                    this.append.apply(this, arguments);
                 else
-                    $.fn.before.apply($(this[0].children[0]), arguments);
+                    this.before.apply($(this[0].children[0]), arguments);
             }
             return this;
         },
@@ -1631,7 +1631,7 @@
             case 'input':       {
                 if (($_This.attr('type') || '').match(/radio|checkbox/i)  &&  iValue)
                     $_This.prop('checked', true);
-                iReturn = $_This.attr('value', iValue);
+                iReturn = this.value = iValue;
                 break;
             }
             default:         {
@@ -2414,11 +2414,13 @@
     $.fx = {interval:  1000 / FPS};
 
     /* ----- CSS 3 Animation ----- */
-    $('head script').eq(0).before('<link />', {
-        rel:     'stylesheet',
-        type:    'text/css',
-        href:    'http://cdn.bootcss.com/animate.css/3.3.0/animate.min.css'
-    });
+    $('head script').eq(0).before(
+        $('<link />', {
+            rel:     'stylesheet',
+            type:    'text/css',
+            href:    'http://cdn.bootcss.com/animate.css/3.3.0/animate.min.css'
+        })
+    );
 
     var Animate_End = 'webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend';
 
@@ -2481,18 +2483,19 @@
 
     /* ----- XML HTTP Request ----- */
     function X_Domain(Target_URL) {
-        var iLocation = BOM.location;
+        var iPort = BOM.location.port || (
+                (BOM.location.protocol == 'http:')  &&  80
+            ) || (
+                (BOM.location.protocol == 'https:')  &&  443
+            );
         Target_URL = Target_URL.match(/^(\w+?(s)?:)?\/\/([\w\d:]+@)?([^\/\:\@]+)(:(\d+))?/);
 
         if (! Target_URL)  return false;
-        if (Target_URL[1] && (Target_URL[1] != iLocation.protocol))  return true;
-        if (Target_URL[4] && (Target_URL[4] != iLocation.hostname))  return true;
-        var iPort = iLocation.port || (
-                (iLocation.protocol == 'http:') && 80
-            ) || (
-                (iLocation.protocol == 'https:') && 443
-            );
-        if (Target_URL[6] && (Target_URL[6] != iPort))  return true;
+        return (
+            (Target_URL[1]  &&  (Target_URL[1] != BOM.location.protocol))  ||
+            (Target_URL[4]  &&  (Target_URL[4] != BOM.location.hostname))  ||
+            (Target_URL[6]  &&  (Target_URL[6] != iPort))
+        );
     }
 
     var XHR_Extension = {
@@ -2538,15 +2541,24 @@
                 return iContent;
             },
             retry:          function (Wait_Seconds) {
-                var iXHR = this;
+                var iXHR = new this.constructor,
+                    iData = this.requestData;
+                iXHR.onready = this.onready;
+                iXHR.open.apply(iXHR, this.requestArgs);
 
                 $.wait(Wait_Seconds, function () {
-                    iXHR.open.apply(iXHR, iXHR.requestArgs);
+                    iXHR.withCredentials = true;
+                    if (typeof iData == 'string')
+                        iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    iXHR.setRequestHeader('Accept', '*/*');
+                    iXHR.send(iData);
                 });
             }
         };
 
-    var XHR_Open = BOM.XMLHttpRequest.prototype.open;
+    var XHR_Open = BOM.XMLHttpRequest.prototype.open,
+        XHR_Send = BOM.XMLHttpRequest.prototype.send;
 
     $.extend(BOM.XMLHttpRequest.prototype, XHR_Extension, {
         open:           function () {
@@ -2562,9 +2574,10 @@
                     iXHR.onready.call(iXHR, iXHR.responseAny());
                 iXHR = null;
             };
-            XHR_Open.apply(this, arguments);
-
-            this.requestArgs = arguments;
+            XHR_Open.apply(this,  this.requestArgs = arguments);
+        },
+        send:    function () {
+            XHR_Send.call(this,  this.requestData = arguments[0]);
         }
     });
 
@@ -2645,8 +2658,9 @@
                     delete this[_GUID_];
                     iDHR.$_DOM.remove();
                 };
+                this.requestData = arguments[0];
                 this.responseURL = iURL[1] + $.param(
-                    $.extend(arguments[0], $.paramJSON(
+                    $.extend({ }, arguments[0], $.paramJSON(
                         iURL[2].replace(/(\w+)=\?/,  '$1=DOMHttpRequest.JSONP.' + _GUID_)
                     ))
                 );
@@ -3200,7 +3214,7 @@
                     }
                 });
                 if (iTitle)
-                    $(this.document.head).append('<title />', {text:  iTitle});
+                    $('<title />', {text:  iTitle}).appendTo(this.document.head);
             });
         } else
             BOM.iShadowCover.open(iContent, iStyle, CloseBack);
@@ -3240,10 +3254,12 @@
         })( $('head > script') ),
         Load_Times = 0;
 
-    var $_Head = $('head').append('<meta />', {
-            'http-equiv':    'Window-Target',
-            content:         '_top'
-        }),
+    var $_Head = $('head').append(
+            $('<meta />', {
+                'http-equiv':    'Window-Target',
+                content:         '_top'
+            })
+        ),
         $_Title = $('head title');
 
 
@@ -3253,35 +3269,39 @@
         if ($.browser.modern) {
             var is_WeChat = UA.match(/MicroMessenger/i),
                 is_UCWeb = UA.match(/UCBrowser|UCWeb/i);
-            $_Title.before('<meta />', {
-                name:       "viewport",
-                content:    [
-                    'width' + '=' + (
-                        ($.browser.mobile && (is_WeChat || is_UCWeb))  ?  320  :  'device-width'
-                    ),
-                    'initial-scale=1.0',
-                    'minimum-scale=1.0',
-                    'maximum-scale=1.0',
-                    'user-scalable=no',
-                    'target-densitydpi=medium-dpi'
-                ].join(',')
-            });
+            $_Title.before(
+                $('<meta />', {
+                    name:       "viewport",
+                    content:    [
+                        'width' + '=' + (
+                            ($.browser.mobile && (is_WeChat || is_UCWeb))  ?  320  :  'device-width'
+                        ),
+                        'initial-scale=1.0',
+                        'minimum-scale=1.0',
+                        'maximum-scale=1.0',
+                        'user-scalable=no',
+                        'target-densitydpi=medium-dpi'
+                    ].join(',')
+                })
+            );
         } else
             $_Title.before(
                 $('<meta />', {
                     name:       'MobileOptimized',
                     content:    320
-                }).add('<meta />', {
-                    name:       'HandheldFriendly',
-                    content:    'true'
-                })
+                }).add(
+                    $('<meta />', {
+                        name:       'HandheldFriendly',
+                        content:    'true'
+                    })
+                )
             );
     }
     if ($.browser.msie)
-        $_Head.append('<meta />', {
+        $('<meta />', {
             'http-equiv':    'X-UA-Compatible',
             content:         'IE=Edge, Chrome=1'
-        });
+        }).appendTo($_Head);
 
 
 /* ---------- Loading Queue ---------- */
