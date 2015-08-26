@@ -4,6 +4,8 @@
 //
 //      [Version]    v1.0  (2015-8-25)  Stable
 //
+//                   (Modern & Mobile Edition)
+//
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
 //
@@ -323,16 +325,6 @@
 
         if ((iType == 'Object')  &&  (typeof iVar.length == 'number')) {
             iType = 'Array';
-            if (! _Browser_.modern)  try {
-                iVar.item();
-                try {
-                    iVar.namedItem();
-                    return 'HTMLCollection';
-                } catch (iError) {
-                    return 'NodeList';
-                }
-            } catch (iError) { }
-        }
 
         return iType;
     };
@@ -428,22 +420,15 @@
 
     /* ----- DOM Property ----- */
     _DOM_.Property = {
-        alias:    {
-            'class':    'className',
-            'for':      'htmlFor'
-        },
         get:      function (iElement, iName) {
-            return  iElement[
-                    _Browser_.modern  ?  iName  :  (this.alias[iName] || iName)
-                ];
+            return  iElement[iName];
         },
         set:      function (iElement, iName, iValue) {
-            iElement[this.alias[iName] || iName] = iValue;
+            iElement[iName] = iValue;
         }
     };
 
     /* ----- DOM Style ----- */
-    var Code_Indent = _Browser_.modern ? '' : ' '.repeat(4);
 
     _DOM_.Style = {
         PX_Needed:    _inKey_(
@@ -516,21 +501,10 @@
     /* ----- DOM Content ----- */
     _DOM_.innerText = {
         set:    function (iElement, iText) {
-            switch ( iElement.tagName.toLowerCase() ) {
-                case 'style':     if (! _Browser_.modern) {
-                    iElement.styleSheet.cssText = iText;
-                    return;
-                }
-                case 'script':    if (! _Browser_.modern) {
-                    iElement.text = iText;
-                    return;
-                }
-                case '':          {
-                    iElement.appendChild( DOM.createTextNode(iText) );
-                    return;
-                }
-            }
-            iElement[_Browser_.ff ? 'textContent' : 'innerText'] = iText;
+            if (iElement.tagName.toLowerCase() == '')
+                iElement.appendChild( DOM.createTextNode(iText) );
+            else
+                iElement[_Browser_.ff ? 'textContent' : 'innerText'] = iText;
         },
         get:    _Browser_.ff ?
             function (iElement) {
@@ -545,23 +519,11 @@
 
     _DOM_.innerHTML = {
         set:    function (iElement, iHTML) {
-            var IE_Scope = String(iHTML).match(
-                    /^[^<]*<\s*(head|meta|title|link|style|script|noscript|(!--[^>]*--))[^>]*>/i
-                );
-
-            if (_Browser_.modern || (! IE_Scope))
-                iElement.innerHTML = iHTML;
-            else {
-                iElement.innerHTML = 'IE_Scope' + iHTML;
-                var iChild = iElement.childNodes;
-                iChild[0].nodeValue = iChild[0].nodeValue.slice(8);
-                if (! iChild[0].nodeValue.length)
-                    iElement.removeChild(iChild[0]);
-            }
+            iElement.innerHTML = iHTML;
 
             return iElement.childNodes;
         }
-    }
+    };
 
     /* ----- DOM Offset ----- */
     function DOM_Offset() {
@@ -1023,10 +985,7 @@
         contains:         function (iParent, iChild) {
             if (! iChild)  return false;
 
-            if ($.browser.modern)
-                return  !!(iParent.compareDocumentPosition(iChild) & 16);
-            else
-                return  (iParent !== iChild) && iParent.contains(iChild);
+            return  !!(iParent.compareDocumentPosition(iChild) & 16);
         }
     });
 
@@ -1073,10 +1032,7 @@
         },
         index:              function (iTarget) {
             if (! iTarget)
-                return  Object_Seek.call(
-                        this[0],
-                        $.browser.modern ? 'previousElementSibling' : 'previousSibling'
-                    ).length;
+                return  Object_Seek.call(this[0], 'previousElementSibling').length;
 
             var iType = $.type(iTarget);
             switch (true) {
@@ -1224,8 +1180,7 @@
 
             for (var i = 0;  i < this.length;  i++)
                 $_Result = Array_Concat($_Result, Object_Seek.call(
-                    this[i],
-                    $.browser.modern ? 'nextElementSibling' : 'nextSibling'
+                    this[i],  'nextElementSibling'
                 ));
 
             if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
@@ -1237,8 +1192,7 @@
 
             for (var i = 0;  i < this.length;  i++)
                 $_Result = Array_Concat($_Result, Object_Seek.call(
-                    this[i],
-                    $.browser.modern ? 'previousElementSibling' : 'previousSibling'
+                    this[i],  'previousElementSibling'
                 ));
 
             if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
@@ -1764,7 +1718,7 @@
             for (var iAttribute in this)
                 _Rule_Block_.push(
                     _DOM_.operate('Style', [null], iAttribute, this[iAttribute])
-                        .replace(/^(\w)/m,  Code_Indent + '$1')
+                        .replace(/^(\w)/m, '$1')
                 );
 
             Rule_Text.push(
@@ -1794,14 +1748,7 @@
                 'class':    'jQuery_CSS-Rule'
             });
 
-        if ($.browser.modern)
-            $_Style.html(CSS_Text);
-        else
-            $_Style[0].styleSheet.cssText = CSS_Text;
-
-        $_Style.appendTo(DOM.head);
-
-        return $_Style[0].sheet;
+        return  $_Style.html(CSS_Text).appendTo(DOM.head)[0].sheet;
     };
 
     $.fn.cssRule = function (iRule, iCallback) {
@@ -1865,423 +1812,6 @@
     };
 
 })(self, self.document);
-
-
-
-/* ---------- IE 8- Patch to W3C ---------- */
-(function (BOM, DOM, $) {
-
-    if ($.browser.modern)  return;
-
-    /* ----- DOM Attribute Name ----- */
-    var iAlias = {
-            'class':    'className',
-            'for':      'htmlFor'
-        },
-        Get_Attribute = Element.prototype.getAttribute,
-        Set_Attribute = Element.prototype.setAttribute,
-        Remove_Attribute = Element.prototype.removeAttribute;
-
-    $.extend(Element.prototype, {
-        getAttribute:    function (iName) {
-            return  Get_Attribute.call(this,  iAlias[iName] || iName,  0);
-        },
-        setAttribute:    function (iName) {
-            return  Set_Attribute.call(this,  iAlias[iName] || iName,  arguments[1],  0);
-        },
-        removeAttribute:    function (iName) {
-            return  Remove_Attribute.call(this,  iAlias[iName] || iName,  0);
-        }
-    });
-
-    /* ----- Computed Style ----- */
-    function CSSStyleDeclaration() {
-        $.extend(this, arguments[0].currentStyle, {
-            length:       0,
-            cssText:      '',
-            ownerNode:    arguments[0]
-        });
-
-        for (var iName in this) {
-            this[this.length++] = iName.toHyphenCase();
-            this.cssText += [
-                iName,  ': ',  this[iName],  '; '
-            ].join('');
-        }
-        this.cssText = this.cssText.trim();
-    }
-
-    var Code_Indent = ' '.repeat(4);
-
-    function toHexInt(iDec, iLength) {
-        var iHex = parseInt( Number(iDec).toFixed(0) ).toString(16);
-
-        if (iLength && (iLength > iHex.length))
-            iHex = '0'.repeat(iLength - iHex.length) + iHex;
-
-        return iHex;
-    }
-
-    function RGB_Hex(iRed, iGreen, iBlue) {
-        var iArgs = $.makeArray(arguments);
-
-        if ((iArgs.length == 1) && (typeof iArgs[0] == 'string'))
-            iArgs = iArgs[0].replace(/rgb\(([^\)]+)\)/i, '$1').replace(/,\s*/g, ',').split(',');
-
-        for (var i = 0;  i < 3;  i++)
-            iArgs[i] = toHexInt(iArgs[i], 2);
-        return iArgs.join('');
-    }
-
-    $.extend(CSSStyleDeclaration.prototype, {
-        getPropertyValue:    function (iName) {
-            var iScale = 1;
-
-            switch (iName) {
-                case 'opacity':    {
-                    iName = 'filter';
-                    iScale = 100;
-                }
-            }
-            var iStyle = this[ iName.toCamelCase() ];
-            var iNumber = parseFloat(iStyle);
-
-            return  isNaN(iNumber) ? iStyle : (iNumber / iScale);
-        },
-        setPropertyValue:    function (iName, iValue) {
-            this[this.length++] = iName;
-
-            var iString = '',  iWrapper,  iScale = 1,  iConvert;
-            if (typeof iValue == 'string')
-                var iRGBA = iValue.match(/\s*rgba\(([^\)]+),\s*(\d\.\d+)\)/i);
-
-            if (iName == 'opacity') {
-                iName = 'filter';
-                iWrapper = 'progid:DXImageTransform.Microsoft.Alpha(opacity={n})';
-                iScale = 100;
-            } else if (iRGBA) {
-                iString = iValue.replace(iRGBA[0], '');
-                if (iString)
-                    iString += arguments.callee.call(this, arguments[0], iName, iString);
-                if (iName != 'background')
-                    iString += arguments.callee.call(
-                        this,
-                        arguments[0],
-                        (iName.indexOf('-color') > -1) ? iName : (iName + '-color'),
-                        'rgb(' + iRGBA[1] + ')'
-                    );
-                iName = 'filter';
-                iWrapper = 'progid:DXImageTransform.Microsoft.Gradient(startColorStr=#{n},endColorStr=#{n})';
-                iConvert = function (iAlpha, iRGB) {
-                    return  toHexInt(parseFloat(iAlpha) * 256, 2) + RGB_Hex(iRGB);
-                };
-            }
-            if (iWrapper)
-                iValue = iWrapper.replace(/\{n\}/g,  iConvert ?
-                      iConvert(iRGBA[2], iRGBA[1]) :
-                      (iValue * iScale)
-                );
-
-            this[ this[this.length - 1].toCamelCase() ] = iValue + (arguments[2] ? ' !important' : '');
-
-            if (this.ownerNode)
-                this.ownerNode.style.setAttribute(iName,  iValue,  arguments[2] && 'important');
-            else
-                return  [iString, ";\n", iName, ':', Code_Indent, iValue].join('');
-        }
-    });
-
-    BOM.getComputedStyle = function () {
-        return  new CSSStyleDeclaration(arguments[0]);
-    };
-
-
-    /* ----- Event Object ----- */
-    BOM.HTMLEvents = function (iEvent) {
-        $.extend(this, DOM.createEventObject());
-
-        if (! iEvent)  return;
-        
-        $.extend(this, {
-            type:               iEvent.type,
-            target:             iEvent.srcElement,
-            which:              (iEvent.type && (iEvent.type.slice(0, 3) == 'key'))  ?
-                iEvent.keyCode  :  [0, 1, 3, 0, 2, 0, 0, 0][iEvent.button],
-            relatedTarget:      ({
-                mouseover:     iEvent.fromElement,
-                mouseout:      iEvent.toElement,
-                mouseenter:    iEvent.fromElement || iEvent.toElement,
-                mouseleave:    iEvent.toElement || iEvent.fromElement
-            })[iEvent.type],
-            bubbles:            true,
-            eventPhase:         3,
-            view:               BOM,
-            isTrusted:          false,
-            propertyName:       iEvent.propertyName
-        });
-    };
-
-    $.extend(BOM.HTMLEvents.prototype, {
-        initEvent:          function () {
-            $.extend(this, {
-                type:          arguments[0],
-                bubbles:       !! arguments[1],
-                cancelable:    !! arguments[2]
-            });
-        },
-        preventDefault:     function () {
-            BOM.event.returnValue = false;
-            this.defaultPrevented = true;
-        },
-        stopPropagation:    function () {
-            BOM.event.cancelBubble = true;
-        }
-    });
-
-    BOM.CustomEvent = function () {
-        BOM.HTMLEvents.call(this, arguments[0]);
-    };
-    BOM.CustomEvent.prototype = new BOM.HTMLEvents();
-    BOM.CustomEvent.prototype.initCustomEvent = function () {
-        $.extend(this, {
-            type:          arguments[0],
-            bubbles:       !! arguments[1],
-            cancelable:    !! arguments[2],
-            detail:        arguments[3] || 0
-        });
-    };
-
-    DOM.createEvent = function () {
-        return  new BOM[arguments[0]]();
-    };
-
-    function IE_Event_Handler(iElement, iCallback) {
-        return  function () {
-                var iEvent = new HTMLEvents(BOM.event),  Loaded;
-
-                switch (iEvent.type) {
-                    case 'readystatechange':    iEvent.type = 'load';
-//                      Loaded = iElement.readyState.match(/loaded|complete/);  break;
-                    case 'load':
-                        Loaded = (iElement.readyState == 'loaded');  break;
-                    case 'propertychange':      {
-                        var iType = iEvent.propertyName.match(/^on(.+)/i);
-                        if (iType && iElement.attributes[iEvent.propertyName].expando)
-                            iEvent.type = iType[1];
-                        else {
-                            iEvent.type = 'DOMAttrModified';
-                            iEvent.attrName = iEvent.propertyName;
-                        }
-                    }
-                    default:                    Loaded = true;
-                }
-                if (Loaded  &&  (typeof iCallback == 'function'))
-                    iCallback.call(iElement, iEvent);
-            };
-    }
-
-    function IE_Event_Type(iType) {
-        var $_This = $(this);
-
-        if (! (('on' + iType) in this.constructor.prototype)) {
-            if (! $_This.data('custom-event')) {
-                $_This.data('custom-event', true);
-                return 'propertychange';
-            } else
-                return '';
-        } else if (($.type(this) != 'Window') && (iType == 'load'))
-            return 'readystatechange';
-
-        return iType;
-    }
-
-    var IE_Event_Method = {
-            addEventListener:       function (iType, iCallback) {
-                var $_This = $(this);
-
-                //  Custom DOM Event
-                var _Type_ = 'on' + iType;
-                if (! (_Type_ in this.constructor.prototype))
-                    if (! $_This.attr(_Type_))
-                        $_This.attr(_Type_, $.now());
-
-                iType = IE_Event_Type.call(this, iType);
-
-                //  DOM Content Loading
-                var This_DOM = ($.type(this) == 'Document') ?
-                        this : (this.ownerDocument || this.document);
-                if (iCallback && (iType == 'DOMContentLoaded')) {
-                    if (BOM !== BOM.top)  iType = 'load';
-                    else {
-                        $.every(0.01, function () {
-                            try {
-                                This_DOM.documentElement.doScroll('left');
-                                iCallback.call(This_DOM, BOM.event);
-                                return false;
-                            } catch (iError) {
-                                return;
-                            }
-                        });
-                        return;
-                    }
-                }
-                if (! iType) return;
-
-                $_This.data('ie-handler',  function (_Index_, iHandler) {
-                    iHandler = iHandler || {
-                        user:     [ ],
-                        proxy:    [ ]
-                    };
-                    iHandler.user.push(iCallback);
-                    iHandler.proxy.push( IE_Event_Handler(this, iCallback) );
-                    this.attachEvent(
-                        'on' + iType,  iHandler.proxy[iHandler.proxy.length - 1]
-                    );
-                    return iHandler;
-                });
-            },
-            removeEventListener:    function (iType, iCallback) {
-                iType = IE_Event_Type.call(this, iType);
-
-                if (! iType) return;
-
-                var iHandler = $(this).data('ie-handler');
-                iHandler = iHandler.proxy[ iHandler.user.indexOf(iCallback) ];
-                if (iHandler)
-                    this.detachEvent('on' + iType,  iHandler);
-            },
-            dispatchEvent:          function (iEvent) {
-                var $_This = $(this);
-                var iType = 'on' + iEvent.type,
-                    iOffset = $_This.offset();
-
-                $.extend(iEvent, {
-                    clientX:    iOffset.left,
-                    clientY:    iOffset.top
-                });
-
-                if (iType in this.constructor.prototype)
-                    this.fireEvent(iType, iEvent);
-                else
-                    $_This.attr(iType, $.now());
-            }
-        };
-
-    $.extend(Element.prototype, IE_Event_Method);
-    $.extend(DOM, IE_Event_Method);
-    $.extend(BOM, IE_Event_Method);
-
-    //  Patch for Change Event
-    $(DOM.body).on('click',  'input[type="radio"], input[type="checkbox"]',  function () {
-        this.blur();
-        this.focus();
-    });
-
-
-    /* ----- XML DOM Parser ----- */
-    var IE_DOMParser = (function (MS_Version) {
-            for (var i = 0; i < MS_Version.length; i++)  try {
-                new ActiveXObject( MS_Version[i] );
-                return MS_Version[i];
-            } catch (iError) { }
-        })([
-            'MSXML2.DOMDocument.6.0',
-            'MSXML2.DOMDocument.5.0',
-            'MSXML2.DOMDocument.4.0',
-            'MSXML2.DOMDocument.3.0',
-            'MSXML2.DOMDocument',
-            'Microsoft.XMLDOM'
-        ]);
-
-    function XML_Create() {
-        var iXML = new ActiveXObject(IE_DOMParser);
-        iXML.async = false;
-        iXML.loadXML(arguments[0]);
-        return iXML;
-    }
-
-    BOM.DOMParser = function () { };
-
-    BOM.DOMParser.prototype.parseFromString = function () {
-        var iXML = XML_Create(arguments[0]);
-
-        if (iXML.parseError.errorCode)
-            iXML = XML_Create([
-                '<xml><parsererror><h3>This page contains the following errors:</h3><div>',
-                iXML.parseError.reason,
-                '</div></parsererror></xml>'
-            ].join(''));
-
-        return iXML;
-    };
-
-})(self, self.document, self.iQuery);
-
-
-
-/* ---------- W3C HTML 5  Shim ---------- */
-(function (BOM, DOM, $) {
-
-    if (! ($.browser.msie < 10))  return;
-
-    /* ----- Element Data Set ----- */
-    function DOMStringMap(iElement) {
-        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
-            iAttr = iElement.attributes[i];
-            if (iAttr.nodeName.slice(0, 5) == 'data-')
-                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
-        }
-    }
-
-    Object.defineProperty(Element.prototype, 'dataset', {
-        get:    function () {
-            return  new DOMStringMap(this);
-        },
-        set:    function () { }
-    });
-
-
-    /* ----- History API ----- */
-    var _State_ = [
-            [null, DOM.title, DOM.URL]
-        ],
-        _Pushing_ = false,
-        $_BOM = $(BOM);
-
-    BOM.history.pushState = function (iState, iTitle, iURL) {
-        for (var iKey in iState)
-            if (! $.isData(iState[iKey]))
-                throw ReferenceError("The History State can't be Complex Object !");
-
-        if (typeof iTitle != 'string')
-            throw TypeError("The History State needs a Title String !");
-
-        DOM.title = iTitle;
-        _Pushing_ = true;
-        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
-    };
-
-    BOM.history.replaceState = function () {
-        _State_ = [ ];
-        this.pushState.apply(this, arguments);
-    };
-
-    $_BOM.on('hashchange',  function () {
-        if (_Pushing_) {
-            _Pushing_ = false;
-            return;
-        }
-
-        var iState = _State_[ BOM.location.hash.slice(2) ];
-        if (! iState)  return;
-
-        BOM.history.state = iState[0];
-        DOM.title = iState[1];
-
-        $_BOM.trigger('popstate');
-    });
-
-})(self, self.document, self.iQuery);
 
 
 
@@ -2742,7 +2272,7 @@
         iXHR.withCredentials = true;
         if (typeof iData == 'string')
             iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+//        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         iXHR.setRequestHeader('Accept', '*/*');
         iXHR.send(iData);
 
@@ -2899,7 +2429,7 @@
             iCallback.call($_Form[0], arguments[0]);
         }
 
-        $_Form.on('submit',  function (iEvent) {
+        $_Form.one('submit',  function (iEvent) {
             iEvent.preventDefault();
             iEvent.stopPropagation();
             $_Button.attr('disabled', true);
@@ -2928,7 +2458,7 @@
 /* ---------- HTML 5 Form Shim ---------- */
 (function ($) {
 
-    if ($.browser.modern && (! $.browser.ios))  return;
+    if (! $.browser.ios)  return;
 
     function Value_Check() {
         var $_This = $(this);
@@ -2970,6 +2500,70 @@
     };
 
 })(self.iQuery);
+
+
+
+(function (BOM, DOM, $) {
+
+    if (! ($.browser.msie < 10))  return;
+
+/* ---------- HTML 5 Element Data Set  Shim ---------- */
+    function DOMStringMap(iElement) {
+        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
+            iAttr = iElement.attributes[i];
+            if (iAttr.nodeName.slice(0, 5) == 'data-')
+                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
+        }
+    }
+
+    Object.defineProperty(Element.prototype, 'dataset', {
+        get:    function () {
+            return  new DOMStringMap(this);
+        },
+        set:    function () { }
+    });
+
+/* ---------- History API Shim ---------- */
+    var _State_ = [
+            [null, DOM.title, DOM.URL]
+        ],
+        _Pushing_ = false,
+        $_BOM = $(BOM);
+
+    BOM.history.pushState = function (iState, iTitle, iURL) {
+        for (var iKey in iState)
+            if (! $.isData(iState[iKey]))
+                throw ReferenceError("The History State can't be Complex Object !");
+
+        if (typeof iTitle != 'string')
+            throw TypeError("The History State needs a Title String !");
+
+        DOM.title = iTitle;
+        _Pushing_ = true;
+        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
+    };
+
+    BOM.history.replaceState = function () {
+        _State_ = [ ];
+        this.pushState.apply(this, arguments);
+    };
+
+    $_BOM.on('hashchange',  function () {
+        if (_Pushing_) {
+            _Pushing_ = false;
+            return;
+        }
+
+        var iState = _State_[ BOM.location.hash.slice(2) ];
+        if (! iState)  return;
+
+        BOM.history.state = iState[0];
+        DOM.title = iState[1];
+
+        $_BOM.trigger('popstate');
+    });
+
+})(self, self.document, self.iQuery);
 
 
 
@@ -3263,6 +2857,8 @@
 //
 //      [Version]    v1.0  (2015-8-25)  Stable
 //
+//                   (Modern & Mobile Edition)
+//
 //      [Usage]      Resource File Asynchronous Loader
 //                   in Web Browser.
 //
@@ -3299,36 +2895,23 @@
 
 /* ----------- Standard Mode Meta Patches ----------- */
     if ($.browser.mobile) {
-        if ($.browser.modern) {
-            var is_WeChat = UA.match(/MicroMessenger/i),
-                is_UCWeb = UA.match(/UCBrowser|UCWeb/i);
-            $_Title.before(
-                $('<meta />', {
-                    name:       "viewport",
-                    content:    [
-                        'width' + '=' + (
-                            ($.browser.mobile && (is_WeChat || is_UCWeb))  ?  320  :  'device-width'
-                        ),
-                        'initial-scale=1.0',
-                        'minimum-scale=1.0',
-                        'maximum-scale=1.0',
-                        'user-scalable=no',
-                        'target-densitydpi=medium-dpi'
-                    ].join(',')
-                })
-            );
-        } else
-            $_Title.before(
-                $('<meta />', {
-                    name:       'MobileOptimized',
-                    content:    320
-                }).add(
-                    $('<meta />', {
-                        name:       'HandheldFriendly',
-                        content:    'true'
-                    })
-                )
-            );
+        var is_WeChat = UA.match(/MicroMessenger/i),
+            is_UCWeb = UA.match(/UCBrowser|UCWeb/i);
+        $_Title.before(
+            $('<meta />', {
+                name:       "viewport",
+                content:    [
+                    'width' + '=' + (
+                        ($.browser.mobile && (is_WeChat || is_UCWeb))  ?  320  :  'device-width'
+                    ),
+                    'initial-scale=1.0',
+                    'minimum-scale=1.0',
+                    'maximum-scale=1.0',
+                    'user-scalable=no',
+                    'target-densitydpi=medium-dpi'
+                ].join(',')
+            })
+        );
     }
     if ($.browser.msie)
         $('<meta />', {
@@ -3504,7 +3087,7 @@
     function Load_End() {
         if ( Load_Times++ )  return;
 
-        var iTimer = $.browser.modern && (! $.browser.ios) && BOM.performance.timing;
+        var iTimer = (! $.browser.ios) && BOM.performance.timing;
 
         var Async_Time = (! iTimer) ? $.end('DOM_Ready') : (
                 (iTimer.domContentLoadedEventEnd - iTimer.navigationStart) / 1000
