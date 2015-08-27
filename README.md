@@ -1,86 +1,87 @@
-#EasyImport.js
+# EasyImport.js
 
-**发布博文** —— [http://log.fyscu.com/index.php/archives/130/][1]
 
-v1.0（单页稳定版）
-=============
+## 【项目概览】
 
-　　这是 **EasyImport.js 第二个功能完备的稳定版**，能给 **单页应用** 提供有力的**异步加载、响应式适配**支持，但不支持 **`<iframe />` 子页面的 JS、CSS 继承**（也就是说，它独立运行于每一个加载它的父/子页面中，不考虑关联页面的相互联系）。
+**EasyImport.js** 能给 传统网页、**单页应用** 提供有力的**脚本异步加载、响应式适配、资源延迟加载**支持，并且拥有这一切的过程也很平滑、自然 ——
 
-　　它将提供**长期 Bug 修复的官方维护**，后续版本与本版的公共代码也将同步更新，但不会再改变 API 的现有结构。而子页面继承将在 v1.0 稳定版给予集成~
+ 1. 脚本加载**顺序即依赖** —— 沿用 **HTML 编程思维习惯**，替代 `<script />` 加载页面中**所有外置、内置 JavaScript 脚本**
+ 2. 书写形式**简洁明了** —— 充分运用 **原生 JavaScript 语法**，不自创小语法
+ 3. **jQuery API** 兼容 —— 基于 [iQuery](http://git.oschina.net/Tech_Query/iQuery) 开发，并开放给**应用开发者**使用，逻辑不复杂的网页无需再加载 jQuery 或 Zepto
 
-【主要特性】
-------
- 1. 替代 `<script />` 加载 HTML 页面中**所有外置、内置 JavaScript 脚本**，但不改变原有“**顺序即依赖**”的前端编程习惯，且书写形式比原来更简洁
- 2. 所有外置脚本都可写在 `<head />` 中，但却能与整个页面的其它部分**并行加载**，**代码结构清晰**而又**高性能**
- 3. 最后一段脚本（无论内置回调、外置脚本）自动在 **DOM Ready** 后加载/执行，既靠谱又方便（`$(document).ready(function () {});` 之类的大包装可以完全不需要了）
- 4. 无依赖的部分外置脚本只需用 `[]`（数组字面量）括起来就可以**异步加载**
- 5. 外置脚本可以根据浏览器平台类型**选择性加载**，模块化管理 JavaScript
- 6. **移动设备浏览器布局模式自适配**：添加其适用的各种 `<meta />` 标签，让网页源码以标准而通用的简洁思维编写，自然地实施**响应式设计**
- 7. 浏览器级的 `<iframe />` 套用防御
- 8. （v0.9+）自带简单的 **加载提示遮罩屏蔽丑陋的渲染过程渲染过程
- 9. （v0.9+）基于精简的 **jQuery 兼容 API** 开发，并开放给**应用开发者**使用，逻辑不复杂的网页无需再加载 jQuery 或 Zepto
- 10.（v1.0+）支持 `<img />`、`<iframe />` 延迟加载（HTML 源码中把用 `data-src` 替代 src 属性）
+【稳定版简史】
+ 1. **最新稳定版 v1.1** —— 发布于 2015年8月27日
+ 2. 首个基于 iQuery 的稳定版 v0.9 —— 发布于 2015年5月10日
+ 3. 首个开源稳定版 v0.6 的发布博文 —— [http://log.fyscu.com/index.php/archives/130/][1]
+ 4. 首个稳定版 v0.4 —— 完成于 2014年中
 
-【平台支持】
-------
+
+## 【核心特性】
+
+ 1. **JavaScript、HTML 并行加载** —— 所有脚本都可写在 `<head />` 中，但却不阻塞页面其它部分的加载，**代码结构清晰**而又**高性能**
+ 2. **内置 DOM Ready** —— 每组加载的最后一段脚本（无论内置回调、外置脚本）自动在 DOM Ready 后加载/执行，既靠谱又方便（`$(document).ready(function () {});` 之类的大包装可以完全不需要了）
+ 3. **JavaScript 异步加载** —— 无依赖的部分外置脚本只需用 `[ ]`（数组字面量）或 `{ }`（对象字面量，v1.1+ 支持）括起来即可异步
+ 4. **JavaScript 条件加载** —— 外置脚本可根据 自定义条件（v1.1+ 支持）**选择性加载**，模块化管理 JavaScript
+ 5. （v0.9+）自带简单的 **加载提示遮罩层** —— 屏蔽丑陋的渲染过程
+ 6. （v1.0+）支持 **大资源延迟加载** —— 把 HTML 源码中 `<img />`、`<iframe />` 的 src 属性替换为 `data-src` 即可被加载器识别
+ 7. **移动设备浏览器布局模式自适配** —— 自动检测并添加合适的各种 `<meta />` 标签，让网页源码以标准而通用的简洁思维编写，自然地实施**响应式设计**
+ 8. （v0.9+）
+ 9. 浏览器级的 `<iframe />` 套用防御
+
+
+## 【平台支持】
  - 主流内核浏览器：IE 8~11、M$ Edge、Firefox 3+、Chrome、Safari、Opera
  - 国产马甲浏览器：傲游 2+、枫树、搜狗高速 3+、360安全/极速、猎豹、QQ 等（还可能有个别奇葩 Bug，恕无力一一测试……）
  - Android、iOS、Windows Phone、Symbian 等智能设备平台上的自带浏览器及其内核控件
 
-【典型案例】
-------
-[http://mag.fyscu.com/iWB/iBookView.php?name=iFY&index=19][2]
 
-以下**示例代码**摘抄自上述网页的 HTML 源码 ——
+## 【典型案例】
+
+[**《i飞扬》电子杂志 HTML 5 在线版**][2]
+
+以下**示例代码**用 **EasyImport.js v1.1+** 重构自[《i飞扬 19期》][3]的 HTML 源码 ——
 ```html
-<head>
-......
-<script type="text/javascript" src="./Libs/EasyImport.js"></script>
-<script>
-ImportJS([
-    {
-        old_PC: 'jQuery.js',
-        new_PC: 'jQuery2.js'
-    },
-    [{
-        old_PC: 'Turn.HTML4.js',
-        new_PC: 'Turn.js'
-    },
-    'Smooth_Scroll.js',
-    'jPlayer.js',
-    'jQuery.Hammer.js',
-    {
-        old_PC: false,
-        new_PC: 'jQuery.PageZoomer.js',
-        Mobile: false
-    },
-    {
-        new_PC:    'Hover_Scroll.js',
-        Mobile:    false
-    }
-    ],
-    'FY_iWeBook.js'
-], function () {
-    $('#iWB').iWeBook('#jPlayer_Box');
-});
+    <head>
+    ......
+    <script type="text/javascript" src="./Libs/EasyImport.js"></script>
+    <script>
+    var old_PC = (! $.browser.modern);
 
-var duoshuoQuery= {short_name:'fyscu'};
-ImportJS(['http://static.duoshuo.com/embed.js']);
-</script>
-......
-</head>
+    ImportJS([
+        {
+            'jQuery.js':     old_PC,
+            'jQuery2.js':    $.browser.modern
+        },
+        {
+            'Turn.HTML4.js':           old_PC,
+            'Turn.js':                 $.browser.modern,
+            'Smooth_Scroll.js':        true,
+            'jPlayer.js':              true,
+            'jQuery.Hammer.js':        true,
+            'jQuery.PageZoomer.js':    ($.browser.modern  &&  (! $.browser.mobile)),
+            'Hover_Scroll.js':         (! $.browser.mobile)
+        },
+        'FY_iWeBook.js'
+    ], function () {
+        $('#iWB').iWeBook('#jPlayer_Box');
+    });
+
+    var duoshuoQuery= {short_name:  'fyscu'};
+    ImportJS( ['http://static.duoshuo.com/embed.js'] );
+    </script>
+    ......
+    </head>
 ```
 
 【项目缘起】
 ------
-　　我在做[《i飞扬》电子杂志 HTML5 在线版][3]的过程中，为了在不改变 **Web 前端程序猿的编程思维习惯**的前提下，保证整个 **WebApp 的好用、可靠**，自己开发了一个**【JavaScript 文件响应式异步加载器】**—— [EasyImport.js][4]。开始只是一段放在 HTML `<head />` 中的小脚本，没觉得是个多么复杂的东西。但随着应用的深入，要想做到自己定下的目标，**代码不断地迭代**，期间也因为严重的 Bug 而怀疑它的价值，所以有了后来的一次较大的局部重构。
+　　我在做[《i飞扬》电子杂志 HTML5 在线版][2]的过程中，为了在不改变 **Web 前端程序猿的编程思维习惯**的前提下，保证整个 **WebApp 的好用、可靠**，自己开发了一个**【JavaScript 文件响应式异步加载器】**—— [EasyImport.js][4]。开始只是一段放在 HTML `<head />` 中的小脚本，没觉得是个多么复杂的东西。但随着应用的深入，要想做到自己定下的目标，**代码不断地迭代**，期间也因为严重的 Bug 而怀疑它的价值，所以有了后来的一次较大的局部重构。
 
 　　但辛劳总会有收获 —— 个人更深刻地理解了 **JavaScript**、**DOM** 的一些细节，它本身也到了足够成熟的地步，作为几个**线上实用项目的基础库**，运行在很多人的浏览器中~
 
 
 
   [1]: http://log.fyscu.com/index.php/archives/130/
-  [2]: http://mag.fyscu.com/iWB/iBookView.php?name=iFY&index=19
-  [3]: http://mag.fyscu.com
+  [2]: http://mag.fyscu.com
+  [3]: http://mag.fyscu.com/iWB/iBookView.php?name=iFY&index=19
   [4]: http://bbs.fyscu.com/forum.php?mod=viewthread&tid=4808

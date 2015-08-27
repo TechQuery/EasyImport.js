@@ -246,12 +246,12 @@
                             Object.prototype.hasOwnProperty.call(arguments[i], iKey)  &&
                             (arguments[i][iKey] !== undefined)
                         ) {
-                            iValue = arguments[i][iKey];
+                            iTarget[iKey] = iValue = arguments[i][iKey];
 
-                            iTarget[iKey] = (iDeep && (
-                                (iValue instanceof Array)  ||  _Object_.isPlainObject(iValue)
-                            )) ?
-                                arguments.callee.call(this, true, undefined, iValue)  :  iValue;
+                            if (iDeep)  try {
+                                if ((iValue instanceof Array)  ||  _Object_.isPlainObject(iValue))
+                                    iTarget[iKey] = arguments.callee.call(this, true, undefined, iValue);
+                            } catch (iError) { }
                         }
                 return iTarget;
             }
@@ -1613,7 +1613,7 @@
             case 'input':       {
                 if (($_This.attr('type') || '').match(/radio|checkbox/i)  &&  iValue)
                     $_This.prop('checked', true);
-                iReturn = this.value = iValue;
+                iReturn = $_This.val(iValue);
                 break;
             }
             default:         {
@@ -2855,12 +2855,12 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-8-25)  Stable
+//      [Version]    v1.1  (2015-8-27)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
-//      [Usage]      Resource File Asynchronous Loader
-//                   in Web Browser.
+//      [Usage]      A Asynchronous & Responsive Loader
+//                   for Resource File in Web Browser.
 //
 //
 //              (C)2013-2015    SCU FYclub-RDD
@@ -2921,66 +2921,28 @@
 
 
 /* ---------- Loading Queue ---------- */
-    var UA_Rule = {
-            old_PC:    ! $.browser.modern,
-            Mobile:    $.browser.mobile,
-            Phone:     $.browser.phone,
-            Pad:       $.browser.pad
-        };
+    function Queue_Filter(iList) {
+        for (var i = 0, _Group_;  i < iList.length;  i++) {
+            _Group_ = iList[i];
 
-    function iQueue() {
-        this.length = 0;
-    }
-    $.extend(iQueue.prototype, {
-        push:        [ ].push,
-        shift:       [ ].shift,
-        splice:      [ ].splice,
-        slice:       [ ].slice,
-        newGroup:    function () {
-            var _Length_;
-
-            if ((! this.length) || this.slice(-1)[0].length) {
-                _Length_ = this.push($.extend([ ],  {
-                    loaded:    0
-                }));
-                this.lastGroup = this.slice(-1)[0];
+            if (typeof _Group_ == 'string') {
+                iList[i] = { };
+                iList[i][_Group_] = true;
             }
-            return _Length_;
-        },
-        add:         function (iFileName) {
-            if (! iFileName.match(/^http(s)?:\/\//))
-                iFileName = Root_Path + iFileName;
-            this[this.length - 1].push( iFileName );
-        }
-    });
+            if ($.isPlainObject( iList[i] )) {
+                _Group_ = [ ];
 
-    function Make_Queue(iList) {
-        for (var i = 0; i < iList.length; i++)
-            if (! (iList[i] instanceof Array))
-                iList[i] = [iList[i]];
+                for (var iScript in iList[i])
+                    if ( iList[i][iScript] )  _Group_.push(iScript);
 
-        var _Queue_ = new iQueue();
-        for (var i = 0; i < iList.length; i++) {
-            _Queue_.newGroup();
-            for (var j = 0, _Item_; j < iList[i].length; j++) {
-                _Item_ = iList[i][j];
-                if (typeof _Item_ == 'string')
-                    _Queue_.add(_Item_);
-                else {
-                    var no_Break = true;
-                    for (RI in UA_Rule)  if (UA_Rule[RI]) {
-                        if (_Item_[RI] === false)
-                            no_Break = false;
-                        else if (_Item_[RI])
-                            _Queue_.add(_Item_[RI]);
-                        break;
-                    }
-                }
-                if (no_Break && (! _Queue_.lastGroup[j]) && _Item_.new_PC)
-                    _Queue_.add(_Item_.new_PC);
+                iList[i] = _Group_;
             }
+            for (var j = 0;  j < _Group_.length;  j++)
+                if (! _Group_[j].match(/^http(s)?:\/\//))
+                    _Group_[j] = Root_Path + _Group_[j];
         }
-        return _Queue_;
+
+        return iList;
     }
 
 
@@ -3125,8 +3087,8 @@
             Func_Args.shift() : null;
 
 
-        var JS_Item = Make_Queue(JS_List);
-        if (CallBack)  JS_Item.push([CallBack]);
+        var JS_Item = Queue_Filter(JS_List);
+        if (CallBack)  JS_Item.push( [CallBack] );
 
         if (! JS_Item[0].length)  return;
 
