@@ -10,7 +10,7 @@
  3. **jQuery API** 兼容 —— 基于 [iQuery](http://git.oschina.net/Tech_Query/iQuery) 开发，并开放给**应用开发者**使用，逻辑不复杂的网页无需再加载 jQuery 或 Zepto
 
 【稳定版简史】
- 1. **最新稳定版 v1.1** —— 发布于 2015年8月27日
+ 1. **最新稳定版 v1.1** —— 发布于 2015年8月27日（同时发布的 Modern 版 删去了 iQuery、EasyImport.js 中的 IE 8 兼容代码）
  2. 首个基于 iQuery 的稳定版 v0.9 —— 发布于 2015年5月10日
  3. 首个开源稳定版 v0.6 的发布博文 —— [http://log.fyscu.com/index.php/archives/130/][1]
  4. 首个稳定版 v0.4 —— 完成于 2014年中
