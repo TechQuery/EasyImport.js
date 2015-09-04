@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-9-1)  Stable
+//      [Version]    v1.0  (2015-9-5)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -107,6 +107,8 @@
         try {
             var _Window_ = this.opener,
                 This_DOM = this.document;
+
+            This_DOM.defaultView = this;
 
             if (_Window_ && (this.location.href == 'about:blank'))
                 This_DOM.domain = _Window_.document.domain;
@@ -213,6 +215,10 @@
                             } catch (iError) { }
                         }
                 return iTarget;
+            },
+            makeArray:        function () {
+                return  _Browser_.modern ?
+                    Array.apply(null, arguments[0])  :  this.extend([ ], arguments[0]);
             }
         };
 
@@ -302,14 +308,14 @@
     }
 
     function Array_Concat() {
-        var iArgs = _Object_.extend([ ], arguments);
+        var iArgs = _Object_.makeArray(arguments);
 
         for (var i = 0;  i < iArgs.length;  i++)
             if (
                 (! (iArgs[i] instanceof Array))  &&
                 (_Object_.type(iArgs[i]) in Type_Info.DOM.set)
             )
-                iArgs[i] = _Object_.extend([ ], iArgs[i]);
+                iArgs[i] = _Object_.makeArray(iArgs[i]);
 
         return  Array.prototype.concat.apply(iArgs.shift(), iArgs);
     }
@@ -389,14 +395,7 @@
 
     /* ----- DOM Style ----- */
     _DOM_.Style = {
-        PX_Needed:    _inKey_(
-            'width',  'min-width',  'max-width',
-            'height', 'min-height', 'max-height',
-            'margin', 'padding',
-            'top',    'left',
-            'border-radius'
-        ),
-        get:          function (iElement, iName) {
+        get:           function (iElement, iName) {
             if ((! iElement) || (_Object_.type(iElement) in Type_Info.DOM.root))
                 return null;
 
@@ -405,7 +404,14 @@
 
             return  isNaN(iNumber) ? iStyle : iNumber;
         },
-        set:          function (iElement, iName, iValue) {
+        PX_Needed:     _inKey_(
+            'width',  'min-width',  'max-width',
+            'height', 'min-height', 'max-height',
+            'margin', 'padding',
+            'top',    'left',
+            'border-radius'
+        ),
+        set:           function (iElement, iName, iValue) {
             if (_Object_.type(iElement) in Type_Info.DOM.root)  return false;
 
             if ((! isNaN( Number(iValue) ))  &&  this.PX_Needed[iName])
@@ -572,16 +578,16 @@
     }
 
     function Proxy_Handler(iEvent) {
-        var iHandler = _DOM_.operate('Data', [this], '_event_')[iEvent.type],
-            iReturn,
-            Trigger_Data = _DOM_.operate('Data', [this], '_trigger_');
-
+        var iHandler = (_DOM_.operate('Data', [this], '_event_') || { })[iEvent.type];
         if (! iHandler)  return;
+
+        var Trigger_Data = _DOM_.operate('Data', [this], '_trigger_'),
+            iReturn;
 
         for (var i = 0, _Return_;  i < iHandler.length;  i++) {
             if ( iHandler[i] )
                 _Return_ = iHandler[i].apply(
-                    this,  _Object_.extend([ ], arguments).concat(Trigger_Data)
+                    this,  _Object_.makeArray(arguments).concat(Trigger_Data)
                 );
             else if (iHandler[i] === false)
                 _Return_ = false;
@@ -851,8 +857,13 @@
         isData:           function () {
             return  (this.type(arguments[0]) in Type_Info.Data);
         },
-        makeArray:        function () {
-            return  $.extend([ ], arguments[0]);
+        isSelector:       function () {
+            try {
+                DOM.querySelector(arguments[0])
+            } catch (iError) {
+                return false;
+            }
+            return true;
         },
         inArray:          function () {
             return  Array.prototype.indexOf.call(arguments[0], arguments[1]);
@@ -1565,7 +1576,7 @@
         switch ( this.tagName.toLowerCase() ) {
             case 'img':      {
                 iReturn = $_This.one('load',  function () {
-                    $(this).trigger('Ready');
+                    $(this).trigger('ready');
                 }).addClass('jQuery_Loading').attr('src', iValue);
                 iResource.count++ ;
                 console.log(this);
@@ -1600,28 +1611,31 @@
     }
 
     $.fn.value = function (iFiller) {
+        var $_Name = this.filter('*[name]');
+        if (! $_Name.length)
+            $_Name = this.find('*[name]');
+
         if (! iFiller)
-            return Value_Operator.call(this[0]);
+            return Value_Operator.call($_Name[0]);
         else if ( $.isPlainObject(iFiller) )
             var Data_Set = true;
 
-        var $_This = this,
-            Resource_Ready = {count:  0};
+        var Resource_Ready = {count:  0},  $_This = this;
 
-        this.on('Ready',  'img.jQuery_Loading',  function () {
+        this.on('ready',  'img.jQuery_Loading',  function () {
             $(this).removeClass('jQuery_Loading');
             if (--Resource_Ready.count == 0)
-                $_This.trigger('Ready');
+                $_This.trigger('ready');
             console.log(Resource_Ready.count, this);
             return false;
         });
 
-        for (var i = 0, iName;  i < this.length;  i++) {
-            iName = this[i].getAttribute('name');
+        for (var i = 0, iName;  i < $_Name.length;  i++) {
+            iName = $_Name[i].getAttribute('name');
 
             Value_Operator.call(
-                this[i],
-                Data_Set  ?  iFiller[iName]  :  iFiller.call(this[i], iName),
+                $_Name[i],
+                Data_Set  ?  iFiller[iName]  :  iFiller.call($_Name[i], iName),
                 Resource_Ready
             );
         }
@@ -1758,22 +1772,73 @@
         return Pseudo_Rule;
     };
 
+})(self, self.document);
 
-/* ---------- Selector Detection ---------- */
-    $.is_Selector = function (iString) {
-        if (! iString)  return false;
 
-        iString = $.trim(
-            iString.replace(/([^\.])(\.|#|\[|:){1,2}[^\.#\[:\s>\+~]+/, '$1')
-        );
-        if (! iString)  return true;
 
-        if ($('<' + iString + ' />')[0] instanceof HTMLUnknownElement)
-            return false;
-        return true;
+/* ---------- W3C HTML 5  Shim ---------- */
+(function (BOM, DOM, $) {
+
+    if (! ($.browser.msie < 10))  return;
+
+    /* ----- Element Data Set ----- */
+    function DOMStringMap(iElement) {
+        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
+            iAttr = iElement.attributes[i];
+            if (iAttr.nodeName.slice(0, 5) == 'data-')
+                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
+        }
+    }
+
+    Object.defineProperty(Element.prototype, 'dataset', {
+        get:    function () {
+            return  new DOMStringMap(this);
+        },
+        set:    function () { }
+    });
+
+
+    /* ----- History API ----- */
+    var _State_ = [
+            [null, DOM.title, DOM.URL]
+        ],
+        _Pushing_ = false,
+        $_BOM = $(BOM);
+
+    BOM.history.pushState = function (iState, iTitle, iURL) {
+        for (var iKey in iState)
+            if (! $.isData(iState[iKey]))
+                throw ReferenceError("The History State can't be Complex Object !");
+
+        if (typeof iTitle != 'string')
+            throw TypeError("The History State needs a Title String !");
+
+        DOM.title = iTitle;
+        _Pushing_ = true;
+        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
     };
 
-})(self, self.document);
+    BOM.history.replaceState = function () {
+        _State_ = [ ];
+        this.pushState.apply(this, arguments);
+    };
+
+    $_BOM.on('hashchange',  function () {
+        if (_Pushing_) {
+            _Pushing_ = false;
+            return;
+        }
+
+        var iState = _State_[ BOM.location.hash.slice(2) ];
+        if (! iState)  return;
+
+        BOM.history.state = iState[0];
+        DOM.title = iState[1];
+
+        $_BOM.trigger('popstate');
+    });
+
+})(self, self.document, self.iQuery);
 
 
 
@@ -2108,6 +2173,55 @@
             console.warn("IE 8/9 XDR doesn't support Changing HTTP Headers...");
         };
 
+    /* ----- HTML DOM SandBox ----- */
+    $.fn.sandBox = function () {
+        var iArgs = $.makeArray(arguments);
+
+        var iCallback = (typeof iArgs.slice(-1)[0] == 'function')  &&  iArgs.pop();
+        var iHTML = (! $.isSelector(iArgs[0])) ? '' : iArgs.shift();
+        var iSelector = iArgs[0];
+
+        var iURL = (! iHTML.match(/<.+?>/))  &&  (iHTML.trim() || 'about:blank'),
+            $_iFrame = this.filter('iframe').eq(0);
+
+        if (! $_iFrame.length)
+            $_iFrame = $('<iframe style="display: none"></iframe>');
+
+        $_iFrame.one('load',  function () {
+            var _DOM_ = this.contentWindow.document;
+
+            function Frame_Ready() {
+                if (! (_DOM_.body && _DOM_.body.childNodes.length))
+                    return;
+
+                var $_Content = $(iSelector || 'body > *',  _DOM_);
+                if (! $_Content.length)
+                    $_Content = _DOM_.body.childNodes;
+
+                if (
+                    (typeof iCallback == 'function')  &&
+                    (false === iCallback.call(
+                        $_iFrame[0],  $('head style', _DOM_).add($_Content).clone(true)
+                    ))
+                )
+                    $_iFrame.remove();
+
+                return false;
+            }
+
+            if (! iURL) {
+                $.every(0.04, Frame_Ready);
+                _DOM_.write(iHTML);
+                _DOM_.close();
+            } else
+                Frame_Ready();
+        });
+
+        if (iURL)  $_iFrame.attr('src', iURL);
+
+        return  $_iFrame[0].parentNode ? this : $_iFrame.appendTo(DOM.body);
+    };
+
     /* ----- DOM HTTP Request ----- */
     BOM.DOMHttpRequest = function () {
         this.status = 0;
@@ -2138,25 +2252,19 @@
                 $_Form.attr('target', iTarget);
             }
 
-            var $_iFrame = $('iframe[name="' + iTarget + '"]');
-            if (! $_iFrame.length)
-                $_iFrame = $('<iframe />', {
-                    frameBorder:          0,
-                    allowTransparency:    true,
-                    name:                 iTarget
+            $('iframe[name="' + iTarget + '"]').sandBox(function () {
+                $(this).on('load',  function () {
+                    $_Button.prop('disabled', false);
+
+                    if (iDHR.readyState)  try {
+                        var $_Content = $(this).contents();
+                        iDHR.responseText = $_Content.find('body').text();
+                        iDHR.status = 200;
+                        iDHR.readyState = 4;
+                        iDHR.onready.call($_Form[0],  iDHR.responseAny(),  $_Content);
+                    } catch (iError) { }
                 });
-
-            $_iFrame.hide().appendTo( $_Form.parent() ).on('load', function () {
-                $_Button.prop('disabled', false);
-
-                if (iDHR.readyState)  try {
-                    var $_Content = $(this).contents();
-                    iDHR.responseText = $_Content.find('body').text();
-                    iDHR.status = 200;
-                    iDHR.readyState = 4;
-                    iDHR.onready.call($_Form[0],  iDHR.responseAny(),  $_Content);
-                } catch (iError) { }
-            });
+            }).attr('name', iTarget);
 
             this.$_DOM = $_Form;
             this.requestArgs = arguments;
@@ -2234,7 +2342,7 @@
         iXHR.withCredentials = true;
         if (typeof iData == 'string')
             iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-//        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         iXHR.setRequestHeader('Accept', '*/*');
         iXHR.send(iData);
 
@@ -2295,46 +2403,6 @@
     });
 
     $.getJSON = $.get;
-
-    /* ----- HTML DOM SandBox ----- */
-    $.fn.sandBox = function (iHTML, iSelector, iCallback) {
-        if (arguments.length < 3) {
-            iCallback = iSelector;
-            iSelector = '';
-        }
-        var iURL = (! iHTML.match(/<.+?>/))  &&  iHTML,
-            $_iFrame = $('<iframe style="display: none"></iframe>');
-
-        $_iFrame.one('load',  function () {
-            var _DOM_ = this.contentWindow.document;
-
-            function Frame_Ready() {
-                if (! (_DOM_.body && _DOM_.body.childNodes.length))
-                    return;
-
-                var $_Content = $(iSelector || 'body > *',  _DOM_);
-                if (! $_Content.length)
-                    $_Content = _DOM_.body.childNodes;
-
-                iCallback.call(
-                    $_iFrame[0],  $('head style', _DOM_).add($_Content).clone(true)
-                );
-
-                return false;
-            }
-
-            if (! iURL) {
-                $.every(0.04, Frame_Ready);
-                _DOM_.write(iHTML);
-                _DOM_.close();
-            } else
-                Frame_Ready();
-        });
-
-        if (iURL)  $_iFrame.attr('src', iURL);
-
-        return $_iFrame.appendTo(DOM.body);
-    };
 
     /* ----- Smart HTML Loading ----- */
     $.fn.load = function (iURL, iData, iCallback) {
@@ -2472,70 +2540,6 @@
     };
 
 })(self.iQuery);
-
-
-
-(function (BOM, DOM, $) {
-
-    if (! ($.browser.msie < 10))  return;
-
-/* ---------- HTML 5 Element Data Set  Shim ---------- */
-    function DOMStringMap(iElement) {
-        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
-            iAttr = iElement.attributes[i];
-            if (iAttr.nodeName.slice(0, 5) == 'data-')
-                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
-        }
-    }
-
-    Object.defineProperty(Element.prototype, 'dataset', {
-        get:    function () {
-            return  new DOMStringMap(this);
-        },
-        set:    function () { }
-    });
-
-/* ---------- History API Shim ---------- */
-    var _State_ = [
-            [null, DOM.title, DOM.URL]
-        ],
-        _Pushing_ = false,
-        $_BOM = $(BOM);
-
-    BOM.history.pushState = function (iState, iTitle, iURL) {
-        for (var iKey in iState)
-            if (! $.isData(iState[iKey]))
-                throw ReferenceError("The History State can't be Complex Object !");
-
-        if (typeof iTitle != 'string')
-            throw TypeError("The History State needs a Title String !");
-
-        DOM.title = iTitle;
-        _Pushing_ = true;
-        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
-    };
-
-    BOM.history.replaceState = function () {
-        _State_ = [ ];
-        this.pushState.apply(this, arguments);
-    };
-
-    $_BOM.on('hashchange',  function () {
-        if (_Pushing_) {
-            _Pushing_ = false;
-            return;
-        }
-
-        var iState = _State_[ BOM.location.hash.slice(2) ];
-        if (! iState)  return;
-
-        BOM.history.state = iState[0];
-        DOM.title = iState[1];
-
-        $_BOM.trigger('popstate');
-    });
-
-})(self, self.document, self.iQuery);
 
 
 
