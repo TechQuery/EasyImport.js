@@ -3295,10 +3295,10 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.1  (2015-5-22)  Beta
+//      [Version]    v1.2  (2015-8-27)  Beta
 //
-//      [Usage]      Only for loading JavaScript files in Single-Page Web,
-//                   no Inherit support for Frames.
+//      [Usage]      A Asynchronous & Responsive Loader
+//                   for Resource File in Web Browser.
 //
 //
 //              (C)2013-2015    SCU FYclub-RDD
@@ -3308,8 +3308,8 @@
 (function (BOM, DOM, $) {
 
 /* ----------- Basic Data ----------- */
-    var UA = navigator.userAgent,
-        RE_FileName = BOM.iRegExp('^[^\\?]*?\\/?([^\\/\\?]+)(\\?.+)?$', undefined, null);
+    var UA = BOM.navigator.userAgent,
+        $_BOM = $(BOM),  $_DOM = $(DOM);
 
     var Root_Path = (function ($_Script) {
             for (var i = 0, iPath;  i < $_Script.length;  i++) {
@@ -3321,10 +3321,12 @@
         })( $('head > script') ),
         Load_Times = 0;
 
-    var $_Head = $('head').append('meta', {
-            'http-equiv':    'Window-Target',
-            content:         '_top'
-        }),
+    var $_Head = $('head').append(
+            $('<meta />', {
+                'http-equiv':    'Window-Target',
+                content:         '_top'
+            })
+        ),
         $_Title = $('head title');
 
     var Last_Loaded = $.now();
@@ -3336,99 +3338,73 @@
         if ($.browser.modern) {
             var is_WeChat = UA.match(/MicroMessenger/i),
                 is_UCWeb = UA.match(/UCBrowser|UCWeb/i);
-            $_Title.before('meta', {
-                name:       "viewport",
-                content:    [
-                    [
-                        'width',
-                        ($.browser.mobile && (is_WeChat || is_UCWeb)) ?
-                            320 : 'device-width'
-                    ].join('='),
-                    'initial-scale=1.0',
-                    'minimum-scale=1.0',
-                    'target-densitydpi=medium-dpi'
-                ].join(',')
-            });
+            $_Title.before(
+                $('<meta />', {
+                    name:       "viewport",
+                    content:    [
+                        'width' + '=' + (
+                            ($.browser.mobile && (is_WeChat || is_UCWeb))  ?  320  :  'device-width'
+                        ),
+                        'initial-scale=1.0',
+                        'minimum-scale=1.0',
+                        'maximum-scale=1.0',
+                        'user-scalable=no',
+                        'target-densitydpi=medium-dpi'
+                    ].join(',')
+                })
+            );
         } else
             $_Title.before(
-                $('meta', {
+                $('<meta />', {
                     name:       'MobileOptimized',
                     content:    320
-                }).add('meta', {
-                    name:       'HandheldFriendly',
-                    content:    'true'
-                })
+                }).add(
+                    $('<meta />', {
+                        name:       'HandheldFriendly',
+                        content:    'true'
+                    })
+                )
             );
     }
     if ($.browser.msie)
-        $_Head.append('meta', {
+        $('<meta />', {
             'http-equiv':    'X-UA-Compatible',
             content:         'IE=Edge, Chrome=1'
-        });
+        }).appendTo($_Head);
 
 
 /* ---------- Loading Queue ---------- */
-    var UA_Rule = {
-            old_PC:    ! $.browser.modern,
-            Mobile:    $.browser.mobile,
-            Phone:     $.browser.phone,
-            Pad:       $.browser.pad
-        };
+    function Queue_Filter(iList) {
+        for (var i = 0, _Group_;  i < iList.length;  i++) {
+            _Group_ = iList[i];
 
-    function iQueue() {
-        this.length = 0;
-    }
-    $.extend(iQueue.prototype, {
-        push:        [ ].push,
-        shift:       [ ].shift,
-        splice:      [ ].splice,
-        slice:       [ ].slice,
-        newGroup:    function () {
-            var _Length_;
-
-            if ((! this.length) || this.slice(-1)[0].length) {
-                _Length_ = this.push($.extend([ ],  {
-                    loaded:    0
-                }));
-                this.lastGroup = this.slice(-1)[0];
+            if (typeof _Group_ == 'string') {
+                iList[i] = { };
+                iList[i][_Group_] = true;
             }
-            return _Length_;
-        },
-        add:         function (iFileName) {
-            if (! iFileName.match(/^http(s)?:\/\//))
-                iFileName = Root_Path + iFileName;
-            this[this.length - 1].push( iFileName );
-        }
-    });
+            if ($.isPlainObject( iList[i] )) {
+                _Group_ = [ ];
 
-    function Make_Queue(iList) {
-        for (var i = 0; i < iList.length; i++)
-            if (! (iList[i] instanceof Array))
-                iList[i] = [iList[i]];
+                for (var iScript in iList[i])
+                    if ( iList[i][iScript] )  _Group_.push(iScript);
 
-        var _Queue_ = new iQueue();
-        for (var i = 0; i < iList.length; i++) {
-            _Queue_.newGroup();
-            for (var j = 0, _Item_; j < iList[i].length; j++) {
-                _Item_ = iList[i][j];
-                if (typeof _Item_ == 'string')
-                    _Queue_.add(_Item_);
-                else {
-                    var no_Break = true;
-                    for (RI in UA_Rule)  if (UA_Rule[RI]) {
-                        if (_Item_[RI] === false)
-                            no_Break = false;
-                        else if (_Item_[RI])
-                            _Queue_.add(_Item_[RI]);
-                        break;
-                    }
-                }
-                if (no_Break && (! _Queue_.lastGroup[j]) && _Item_.new_PC)
-                    _Queue_.add(_Item_.new_PC);
+                iList[i] = _Group_;
             }
+            for (var j = 0;  j < _Group_.length;  j++)
+                if (! _Group_[j].match(/^http(s)?:\/\//))
+                    _Group_[j] = Root_Path + _Group_[j];
         }
-        return _Queue_;
+
+        return iList;
     }
+
+
+/* ---------- DOM Template ---------- */
+    var $_Script = $('<script />', {
+            type:       'text/javascript',
+            charset:    'UTF-8',
+            'class':    'EasyImport'
+        });
 
 
 /* ---------- DOM Load-Engine ---------- */
@@ -3441,7 +3417,7 @@
         var This_Call = arguments;
 
         if ((! iOrder[1]) && (this !== DOM)) {
-            $(DOM).ready(function () {
+            $_DOM.ready(function () {
                 This_Call.callee.apply(this, This_Call);
             });
             return;
@@ -3452,14 +3428,14 @@
         function _Next_() {
             if ( iOrder[0][++This_Group] )  return;
 
-            $(this).data('Load_During', $.end(
-                this.src.match(RE_FileName)[1]
-            ));
+            if (typeof this != 'function')
+                $(this).data('Load_During',  $.end( $.fileName(this.src) ));
+
             iOrder.shift();
             This_Call.callee.apply(this, This_Call);
         }
 
-        for (var i = 0, iScript;  i < iOrder[0].length;  i++) {
+        for (var i = 0, iScript;  (iOrder[0] && (i < iOrder[0].length));  i++) {
             iScript = iOrder[0][i];
 
             if (typeof iScript == 'function') {
@@ -3467,14 +3443,9 @@
                 _Next_.call(iScript);
                 continue;
             }
-            $_Head.append('script', {
-                type:       'text/javascript',
-                charset:    'UTF-8',
-                'class':    'EasyImport',
-                src:        iScript,
-                onload:     _Next_
-            });
-            $.start( iScript.match(RE_FileName)[1] );
+            $_Script.clone().one('load', _Next_).attr('src', iScript).appendTo($_Head);
+
+            $.start( $.fileName(iScript) );
         }
     }
 
@@ -3498,9 +3469,7 @@
     BOM.define.amd = 'EasyImport.js';
 
     BOM.require = function () {
-        return  $_Head.data('AMD')[
-                arguments[0].match(RE_FileName)[1]
-            ].export;
+        return  $_Head.data('AMD')[ $.fileName(arguments[0]) ].export;
     };
 
     function Depend_Array(All_Module, iDepend) {
@@ -3519,7 +3488,7 @@
         function _Next_() {
             var _Module_ = $_Head.data('AMD'),
                 iModule,
-                iName = this.src.match(RE_FileName)[1];
+                iName = $.fileName(this.src);
 
             iModule = _Module_[iName];
             if (! iModule) {
@@ -3532,7 +3501,7 @@
                 if (this.loaded == this.length)  return;
 
                 for (var i = 0;  i < this.length;  i++) {
-                    iModule = _Module_[ this[i].match(RE_FileName)[1] ];
+                    iModule = _Module_[ $.fileName(this[i]) ];
                     if (! iModule)  continue;
 
                     for (var j = 0, _Export_, iExport;  j < iModule.length;  j++)
@@ -3558,7 +3527,7 @@
             var This_Call = arguments;
 
             if ((i + 1) == iOrder.length) {
-                $(DOM).ready(function () {
+                $_DOM.ready(function () {
                     This_Call.callee.call(this, ++i);
                     iFinal();
                 });
@@ -3567,13 +3536,7 @@
 
             for (var j = 0;  j < this.length;  j++) {
                 if (typeof this[j] != 'function')
-                    $_Head.append('script', {
-                        type:       'text/javascript',
-                        charset:    'UTF-8',
-                        'class':    'EasyImport',
-                        src:        this[j],
-                        onload:     _Next_
-                    });
+                    $_Script.clone().one('load', _Next_).attr('src', this[j]).appendTo($_Head);
                 else
                     BOM.define(this[j].name || ('Func_' + iFunc++),  [ ],  this[j]);
             }
@@ -3581,27 +3544,66 @@
     }
 
 // ----------- Open API ----------- //
-    $.cssRule({
-        '#iSC.EasyImport': {
-            background:    'darkgray'
-        },
-        '#iSC.EasyImport h1': {
-            color:    'white'
-        }
-    });
-    $(DOM).ready(function () {
-        $('#iSC').addClass('EasyImport');
-        BOM.showModalDialog($('<h1>Loading...</h1>'), 1);
-    });
+    $_DOM.ready(function () {
+        BOM.showModalDialog($('<h1>Loading...</h1>'), {
+            ' ': {
+                background:    'darkgray'
+            },
+            ' h1': {
+                color:    'white'
+            }
+        });
+        $('body > .Cover :header').cssAnimate('fadeIn', 2000, true);
 
+    /* ----- Lazy Loading  v0.1 ----- */
+        var VP_Height = $_BOM.height(),
+            $_Lazy = $('img[data-src], iframe[data-src]');
+        var Lazy_List = $.extend({ }, {
+                length:    $_Lazy.length
+            }),
+            Load_List = [ ];
+
+        $_Lazy.each(function () {
+            var Off_Top = $(this).offset().top;
+
+            var i = (Off_Top < VP_Height)  ?  0  :  (Off_Top - VP_Height);
+
+            for (;  i < Off_Top;  i++)
+                if (! Lazy_List[i])
+                    Lazy_List[i] = [this];
+                else
+                    Lazy_List[i].push(this);
+        });
+
+        $_BOM.scroll(function () {
+            var iLazy = Lazy_List[ $_DOM.scrollTop() ];
+            if (! iLazy)  return;
+
+            for (var i = 0;  i < iLazy.length;  i++) {
+                if ($.inArray(Load_List, iLazy[i]) != -1)  continue;
+
+                iLazy[i].src = iLazy[i].attributes['data-src'].nodeValue;
+                Load_List.push( iLazy[i] );
+
+                if (--Lazy_List.length == 0) {
+                    $_BOM.unbind('scroll', arguments.callee);
+                    Lazy_List = Load_List = null;
+                }
+            }
+        });
+    });
 
     function Load_End() {
-        if (Load_Times > 1)  return;
+        if ( Load_Times++ )  return;
 
-        var Async_Time = $.end('DOM_Ready'),
-            Sync_Time = $(DOM).data('Load_During');
+        var iTimer = $.browser.modern && (! $.browser.ios) && BOM.performance.timing;
+
+        var Async_Time = (! iTimer) ? $.end('DOM_Ready') : (
+                (iTimer.domContentLoadedEventEnd - iTimer.navigationStart) / 1000
+            ),
+            Sync_Time = $_DOM.data('Load_During');
         $('head > script.EasyImport').each(function () {
-            Sync_Time += $(this).data('Load_During');
+            Sync_Time += $(this).data('Load_During') || 0;
         });
         console.info([
             '[ EasyImport.js ]  Time Statistics',
@@ -3613,6 +3615,8 @@
         ].join("\n\n"));
 
         BOM.iShadowCover.close();
+
+        $(DOM.body).trigger('ScriptLoad');
     }
 
 
@@ -3630,8 +3634,8 @@
             Func_Args.shift() : null;
 
 
-        var JS_Item = Make_Queue(JS_List);
-        if (CallBack)  JS_Item.push([CallBack]);
+        var JS_Item = Queue_Filter(JS_List);
+        if (CallBack)  JS_Item.push( [CallBack] );
 
         if (! JS_Item[0].length)  return;
 
