@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-5-29)  Stable
+//      [Version]    v1.0  (2015-9-5)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -12,38 +12,25 @@
 //
 
 
-/* ---------- Debug Module ---------- */
-if (! console) {
-    function _Notice_() {
-        var iString = [ ];
+/* ---------- ECMAScript 5/6  Patch ---------- */
+(function (BOM) {
 
-        for (var i = 0;  i < arguments;  i++)
-            iString.push( arguments[i].toString() );
+    if (! console) {
+        function _Notice_() {
+            var iString = [ ];
 
-        self.status = iString.join(' ');
-    }
-    var console = {
+            for (var i = 0;  i < arguments;  i++)
+                iString.push( String(arguments[i]) );
+
+            BOM.status = iString.join(' ');
+        }
+        BOM.console = {
             log:      _Notice_,
             info:     _Notice_,
             warn:     _Notice_,
             error:    _Notice_
         };
-}
-self.onerror = function () {
-    this.alert([
-        arguments[0],
-        arguments[1],
-        'Line:  ' + arguments[2]
-    ].join("\n\n"));
-
-    this.prompt('[Debug]', this.navigator.userAgent);
-
-    return true;
-};
-
-
-/* ---------- ECMAScript 5  Patch ---------- */
-(function (BOM) {
+    }
 
     BOM.iRegExp = function (iString, Mode, Special_Char) {
         var iRegExp_Compiled = / /,
@@ -63,17 +50,7 @@ self.onerror = function () {
         return iRegExp_Compiled;
     };
 
-    if (! ''.trim) {
-        var Blank_Char = BOM.iRegExp('(^\\s*)|(\\s*$)', 'g');
-
-        String.prototype.trim = function () {
-            return this.replace(Blank_Char, '');
-        };
-    }
-    if (! ''.repeat)
-        String.prototype.repeat = function (Times) {
-            return  (new Array(Times + 1)).join(this);
-        };
+    /* ----- Array Extension ----- */
 
     if (! [ ].indexOf)
         Array.prototype.indexOf = function () {
@@ -84,24 +61,76 @@ self.onerror = function () {
             return -1;
         };
 
+    if (! [ ].map)
+        Array.prototype.map = function (iCallback) {
+            if (typeof iCallback != 'function')
+                throw  TypeError(iCallback + ' is not a function');
+
+            var New_Array = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                if (this[i] !== undefined)
+                    New_Array.concat(
+                        iCallback.call(arguments[1] || BOM,  this[i],  i,  this)
+                    );
+            return New_Array;
+        };
+
+    /* ----- String Extension ----- */
+
+    if (! ''.trim)
+        var Blank_Char = BOM.iRegExp('(^\\s*)|(\\s*$)', 'g');
+    else
+        var _Trim_ = ''.trim;
+
+    String.prototype.trim = function (iChar) {
+        if (! iChar)
+            return  Blank_Char ? this.replace(Blank_Char, '') : _Trim_.call(this);
+        else {
+            for (var i = 0, a = 0, b;  i < iChar.length;  i++) {
+                if ((this[0] == iChar[i]) && (! a))
+                    a = 1;
+                if ((this[this.length - 1] == iChar[i]) && (! b))
+                    b = -1;
+            }
+            return this.slice(a, b);
+        }
+    };
+
+    if (! ''.repeat)
+        String.prototype.repeat = function (Times) {
+            return  (new Array(Times + 1)).join(this);
+        };
+
+    String.prototype.toCamelCase = function () {
+        var iName = this.split(arguments[0] || '-');
+
+        for (var i = 1;  i < iName.length;  i++)
+            iName[i] = iName[i][0].toUpperCase() + iName[i].slice(1);
+
+        return iName.join('');
+    };
+
+    String.prototype.toHyphenCase = function () {
+        return  Array.prototype.map.call(this,  function (iChar) {
+            if ((iChar >= 'A')  &&  (iChar < 'a'))
+                return  ['-', iChar.toLowerCase()];
+
+            if ((iChar < '0')  ||  (iChar > 'z'))
+                return '-';
+
+            return iChar;
+        }).join('');
+    };
+
+    /* ----- Date Extension ----- */
+
     if (! Date.now)
         Date.now = function () {
             return  (new Date()).getTime();
         };
 
-    if ( BOM.navigator.userAgent.match(/; rv:(\d+)[^\/]+Gecko\/\d+/) )
-        Object.defineProperty(HTMLElement, 'innerText', {
-            set:    function (iText) {
-                this.textContent = iText;
-            },
-            get:    function () {
-                var TextRange = this.ownerDocument.createRange();
-                TextRange.selectNodeContents(this);
-                return TextRange.toString();
-            }
-        });
-
-//  JSON Extension  v0.4
+    /* ----- JSON Extension  v0.4 ----- */
 
     BOM.JSON.format = function () {
         return  this.stringify(arguments[0], null, 4)
@@ -118,7 +147,7 @@ self.onerror = function () {
             });
     };
 
-//  New Window Fix  v0.3
+    /* ----- New Window Fix  v0.3 ----- */
 
     BOM.new_Window_Fix = function (Fix_More) {
         if (! this)  return false;
@@ -127,10 +156,12 @@ self.onerror = function () {
             var _Window_ = this.opener,
                 This_DOM = this.document;
 
+            This_DOM.defaultView = this;
+
             if (_Window_ && (this.location.href == 'about:blank'))
                 This_DOM.domain = _Window_.document.domain;
 
-            if (! (_Window_ || this).$.browser.modern)
+            if (! (_Window_ || this).navigator.userAgent.match(/MSIE 8/i))
                 This_DOM.head = This_DOM.documentElement.firstChild;
         } catch (iError) {
             return false;
@@ -146,139 +177,168 @@ self.onerror = function () {
 })(self);
 
 
-// ---------->  iQuery.js  <---------- //
+
+/* ---------- iQuery Core & API ---------- */
 (function (BOM, DOM) {
-    
+
 /* ---------- UA Check ---------- */
     var UA = navigator.userAgent;
+
     var is_Trident = UA.match(/MSIE (\d+)|Trident[^\)]+rv:(\d+)/i),
         is_Gecko = UA.match(/; rv:(\d+)[^\/]+Gecko\/\d+/),
-        is_Webkit = UA.match(/Webkit/i);
+        is_Webkit = UA.match(/AppleWebkit\/(\d+\.\d+)/i);
     var IE_Ver = is_Trident ? Number(is_Trident[1] || is_Trident[2]) : NaN,
-        FF_Ver = is_Gecko ? Number(is_Gecko[1]) : NaN;
+        FF_Ver = is_Gecko ? Number(is_Gecko[1]) : NaN,
+        WK_Ver = is_Webkit ? parseFloat(is_Webkit[1]) : NaN;
+
     var is_Pad = UA.match(/Tablet|Pad|Book|Android 3/i),
         is_Phone = UA.match(/Phone|Touch|Android 2|Symbian/i);
     var is_Mobile = (
             is_Pad || is_Phone || UA.match(/Mobile/i)
         ) && (! UA.match(/ PC /));
-    var is_iOS = is_Mobile && UA.match(/(iTouch|iPhone|iPad|iWatch);[^\)]+CPU[^\)]+OS (\d)_/i),
+
+    var is_iOS = UA.match(/(iTouch|iPhone|iPad|iWatch);[^\)]+CPU[^\)]+OS (\d+_\d+)/i),
         is_Android = UA.match(/(Android |Silk\/)(\d+\.\d+)/i);
 
     var _Browser_ = {
             msie:             IE_Ver,
             ff:               FF_Ver,
+            webkit:           WK_Ver,
             modern:           !  (IE_Ver < 9),
             mobile:           !! is_Mobile,
             pad:              !! is_Pad,
             phone:            !! is_Phone,
-            ios:              is_iOS && is_iOS[2],
-            android:          is_Android && is_Android[2],
-            versionNumber:    IE_Ver || FF_Ver
+            ios:              is_iOS  ?  parseFloat( is_iOS[2].replace('_', '.') )  :  NaN,
+            android:          is_Android ? parseFloat(is_Android[2]) : NaN,
+            versionNumber:    IE_Ver || FF_Ver || WK_Ver
         };
 
 
-/* ----- Object Base ----- */
-    function _Extend_(iTarget) {
-        iTarget = iTarget || (
-            (arguments[1] instanceof Array)  ?  [ ]  :  { }
-        );
+/* ---------- Object Base ---------- */
+    var _Object_ = {
+            isEmptyObject:    function () {
+                for (var iKey in arguments[0])
+                    return false;
+                return true;
+            },
+            isPlainObject:    function (iValue) {
+                return  iValue && (iValue.constructor === Object);
+            },
+            each:             function (Arr_Obj, iEvery) {
+                if (Arr_Obj) {
+                    if (typeof Arr_Obj.length == 'number') {
+                        for (var i = 0;  i < Arr_Obj.length;  i++)
+                            if (iEvery.call(Arr_Obj[i], i, Arr_Obj[i]) === false)
+                                break;
+                    } else  for (var iKey in Arr_Obj)
+                        if (iEvery.call(Arr_Obj[iKey], iKey, Arr_Obj[iKey]) === false)
+                            break;
+                }
+                return Arr_Obj;
+            },
+            extend:           function () {
+                var iDeep = (arguments[0] === true);
+                var iTarget,
+                    iFirst = iDeep ? 1 : 0;
 
-        for (var i = 1;  i < arguments.length;  i++)
-            for (var iKey in arguments[i])
-                if ( Object.prototype.hasOwnProperty.call(arguments[i], iKey) )
-                    iTarget[iKey] = arguments[i][iKey];
+                if (arguments.length  >  (iFirst + 1)) {
+                    iTarget = arguments[iFirst] || (
+                        (arguments[iFirst + 1] instanceof Array)  ?  [ ]  :  { }
+                    );
+                    iFirst++ ;
+                } else
+                    iTarget = this;
 
-        return iTarget;
+                for (var i = iFirst, iValue;  i < arguments.length;  i++)
+                    for (var iKey in arguments[i])
+                        if (
+                            Object.prototype.hasOwnProperty.call(arguments[i], iKey)  &&
+                            (arguments[i][iKey] !== undefined)
+                        ) {
+                            iTarget[iKey] = iValue = arguments[i][iKey];
+
+                            if (iDeep)  try {
+                                if ((iValue instanceof Array)  ||  _Object_.isPlainObject(iValue))
+                                    iTarget[iKey] = arguments.callee.call(this, true, undefined, iValue);
+                            } catch (iError) { }
+                        }
+                return iTarget;
+            },
+            makeArray:        function () {
+                return  _Browser_.modern ?
+                    Array.apply(null, arguments[0])  :  this.extend([ ], arguments[0]);
+            }
+        };
+
+    function _inKey_() {
+        var iObject = { };
+
+        for (var i = 0;  i < arguments.length;  i++)
+            iObject[arguments[i]] = true;
+
+        return iObject;
     }
 
     var Type_Info = {
-            Data:         {
-                String:     true,
-                Number:     true,
-                Boolean:    true,
-                Object:     true,
-                Null:       true
-            },
-            BOM:          {
-                'Window':       true,
-                'DOMWindow':    true,
-                'global':       true
-            },
+            Data:         _inKey_('String', 'Number', 'Boolean', 'Null'),
+            BOM:          _inKey_('Window', 'DOMWindow', 'global'),
             DOM:          {
-                set:        {
-                    Array:             true,
-                    HTMLCollection:    true,
-                    NodeList:          true,
-                    jQuery:            true,
-                    iQuery:            true
-                },
-                element:    {
-                    Document:    true,
-                    Element:     true,
-                    Window:      true
-                },
-                root:       {
-                    Document:    true,
-                    Window:      true
-                },
-                button:     {
-                    button:    true,
-                    submit:    true,
-                    reset:     true
-                }
+                set:        _inKey_('Array', 'HTMLCollection', 'NodeList', 'jQuery', 'iQuery'),
+                element:    _inKey_('Window', 'Document', 'HTMLElement'),
+                root:       _inKey_('Document', 'Window')
             },
-            DOM_Event:    [
-                'load',  'abort',  'error',
-                'keydown',  'keypress',  'keyup',
-                'mousedown',  'mouseup',  'mousemove',
-                'mouseover',  'mouseout',  'mouseenter',  'mouseleave',
-                'click',  'dblclick',  'scroll',  'mousewheel',
-                'select',  'focus',  'blur',  'change',  'submit',  'reset',
-                'DOMContentLoaded'
-            ],
-            Float:        {
-                absolute:    true,
-                fixed:       true
-            }
+            DOM_Event:    _inKey_(
+                'load', 'abort', 'error',
+                'keydown', 'keypress', 'keyup',
+                'mousedown', 'mouseup', 'mousemove',
+                'mouseover', 'mouseout', 'mouseenter', 'mouseleave',
+                'click', 'dblclick', 'scroll', 'mousewheel',
+                'select', 'focus', 'blur', 'change', 'submit', 'reset',
+                'DOMContentLoaded',
+                'DOMAttrModified', 'DOMAttributeNameChanged',
+                'DOMCharacterDataModified',
+                'DOMElementNameChanged',
+                'DOMNodeInserted', 'DOMNodeInsertedIntoDocument',
+                'DOMNodeRemoved',  'DOMNodeRemovedFromDocument',
+                'DOMSubtreeModified'
+            ),
+            Target:       _inKey_('_top', '_parent', '_self', '_blank')
         };
-    _Extend_(Type_Info.DOM.element, (function () {
-        var iType = { },  _Name_;
 
-        for (var iVar in BOM) {
-            _Name_ = iVar.match(/HTML(\w+?Element)$/);
-            if (_Name_)
-                iType[_Name_[1]] = true;
+    _Object_.type = function (iVar) {
+        var iType = typeof iVar;
+
+        iType = (iType == 'object') ? (
+                (iVar && iVar.constructor.name) ||
+                Object.prototype.toString.call(iVar).match(/\[object\s+([^\]]+)\]/i)[1]
+            ) : (
+                iType[0].toUpperCase() + iType.slice(1)
+            );
+
+        if (! iVar)  switch (true) {
+            case (isNaN(iVar)  &&  (iVar !== iVar)):    return 'NaN';
+            case (iVar === null):                       return 'Null';
+            default:                                    return iType;
         }
 
-        return iType;
-    })());
+        if (
+            Type_Info.BOM[iType] ||
+            ((iVar == iVar.document) && (iVar.document != iVar))
+        )
+            return 'Window';
 
-    function _Type_(iVar) {
-        var iType = typeof iVar;
-        if (iType == 'object')
-            iType = Object.prototype.toString.call(iVar)
-                        .split(' ')[1].slice(0, -1);
-        else
-            iType = iType[0].toUpperCase() + iType.slice(1);
+        if (iVar.defaultView || iVar.documentElement)
+            return 'Document';
 
-        if (iVar) {
-            if (
-                Type_Info.BOM[iType] ||
-                ((iVar == iVar.document) && (iVar.document != iVar))
-            )
-                return 'Window';
-            else if (iVar.defaultView || iVar.documentElement)
-                return 'Document';
-            else if (
-                iType.match(/HTML\w+?Element$/) ||
-                (typeof iVar.tagName == 'string')
-            )
-                return 'Element';
-            else if (
-                (_Browser_.msie < 9) &&
-                (iType == 'Object') &&
-                (typeof iVar.length == 'number')
-            )  try {
+        if (
+            iType.match(/HTML\w+?Element$/) ||
+            (typeof iVar.tagName == 'string')
+        )
+            return 'HTMLElement';
+
+        if ((iType == 'Object')  &&  (typeof iVar.length == 'number')) {
+            iType = 'Array';
+            if (! _Browser_.modern)  try {
                 iVar.item();
                 try {
                     iVar.namedItem();
@@ -287,13 +347,12 @@ self.onerror = function () {
                     return 'NodeList';
                 }
             } catch (iError) { }
-        } else if (isNaN(iVar) && (iVar !== iVar))
-            return 'NaN';
+        }
 
         return iType;
-    }
+    };
 
-    function Back_Track(iName, iCallback) {
+    function Object_Seek(iName, iCallback) {
         var iResult = [ ];
 
         for (var _This_ = this, _Next_, i = 0;  _This_[iName];  _This_ = _Next_, i++) {
@@ -306,228 +365,243 @@ self.onerror = function () {
         return iResult;
     }
 
+    function Array_Concat() {
+        var iArgs = _Object_.makeArray(arguments);
 
-/* ----- DOM Info Operator - Get first, set all. ----- */
-    var _Get_Set_ = { };
+        for (var i = 0;  i < iArgs.length;  i++)
+            if (
+                (! (iArgs[i] instanceof Array))  &&
+                (_Object_.type(iArgs[i]) in Type_Info.DOM.set)
+            )
+                iArgs[i] = _Object_.makeArray(iArgs[i]);
 
-    function _Operator_(iType, iElement, iName, iValue) {
-        var iResult;
-
-        if (! iName) {
-            for (var i = 0;  i < iElement.length;  i++)
-                _Get_Set_[iType].clear(iElement[i]);
-        } else if (_Type_(iValue) == 'Undefined') {
-            if (_Type_(iName) == 'String')
-                return  _Get_Set_[iType].get(iElement[0], iName);
-            else if (_Type_(iName.length) == 'Number') {
-                var iData = { };
-                for (var i = 0;  i < iName.length;  i++)
-                    iData[iName[i]] = _Get_Set_[iType].get(iElement[0], iName[i]);
-                return iData;
-            } else if (_Type_(iName) == 'Object')
-                for (var i = 0;  i < iElement.length;  i++)
-                    for (var iKey in iName)
-                        iResult = _Get_Set_[iType].set(iElement[i], iKey, iName[iKey]);
-        } else
-            for (var i = 0;  i < iElement.length;  i++)
-                iResult = _Get_Set_[iType].set(iElement[i], iName, iValue);
-
-        return iResult;
+        return  Array.prototype.concat.apply(iArgs.shift(), iArgs);
     }
 
 
-    /* ----- DOM Style ----- */
-    var IE_CSS_Filter = (_Browser_.msie < 9);
-    var Code_Indent = (! IE_CSS_Filter) ? '' : ' '.repeat(4);
-
-    function toHexInt(iDec, iLength) {
-        var iHex = parseInt( Number(iDec).toFixed(0) ).toString(16);
-
-        if (iLength && (iLength > iHex.length))
-            iHex = '0'.repeat(iLength - iHex.length) + iHex;
-
-        return iHex;
-    }
-
-    function RGB_Hex(iRed, iGreen, iBlue) {
-        var iArgs = _Extend_([ ], arguments);
-
-        if ((iArgs.length == 1) && (typeof iArgs[0] == 'string'))
-            iArgs = iArgs[0].replace(/rgb\(([^\)]+)\)/i, '$1').replace(/,\s*/g, ',').split(',');
-
-        for (var i = 0; i < 3; i++)
-            iArgs[i] = toHexInt(iArgs[i], 2);
-        return iArgs.join('');
-    }
-
-    _Get_Set_.Style = {
-        PX_Needed:    {
-            width:              true,
-            'min-width':        true,
-            'max-width':        true,
-            height:             true,
-            'min-height':       true,
-            'max-height':       true,
-            'border-radius':    true,
-            margin:             true,
-            padding:            true,
-            top:                true,
-            left:               true
-        },
-        get:          function (iElement, iName) {
-            if ((! iElement) || (_Type_(iElement) in Type_Info.DOM.root))
-                return null;
-
-            var iScale = 1;
-
-            if (IE_CSS_Filter)
-                switch (iName) {
-                    case 'opacity':    {
-                        iName = 'filter';
-                        iScale = 100;
-                    }
+/* ---------- DOM Info Operator - Get first, Set all. ---------- */
+    var _DOM_ = {
+            Get_Name_Type:    _inKey_('String', 'Array'),
+            operate:          function (iType, iElement, iName, iValue) {
+                if ((! iName) || (iValue === null)) {
+                    if (this[iType].clear)
+                        for (var i = 0;  i < iElement.length;  i++)
+                            this[iType].clear(iElement[i], iName);
+                    return iElement;
                 }
+                if ((iValue === undefined) && (_Object_.type(iName) in this.Get_Name_Type)) {
+                    if (! iElement.length)
+                        return;
+                    else if (typeof iName == 'string')
+                        return  this[iType].get(iElement[0], iName);
+                    else {
+                        var iData = { };
+                        for (var i = 0;  i < iName.length;  i++)
+                            iData[iName[i]] = this[iType].get(iElement[0], iName[i]);
+                        return iData;
+                    }
+                } else {
+                    var iResult;
 
-            var iStyle = IE_CSS_Filter ?
-                    iElement.currentStyle.getAttribute(iName) :
-                    DOM.defaultView.getComputedStyle(iElement, null).getPropertyValue(iName);
+                    if (typeof iName == 'string') {
+                        if (typeof iValue == 'function') {
+                            for (var i = 0;  i < iElement.length;  i++)
+                                iResult = this[iType].set(iElement[i], iName, iValue.call(
+                                    iElement[i],  i,  this[iType].get(iElement[i], iName)
+                                ));
+                            return  iResult || iElement;
+                        } else {
+                            iResult = { };
+                            iResult[iName] = iValue;
+                            iName = iResult;
+                            iResult = undefined;
+                        }
+                    }
+                    for (var i = 0;  i < iElement.length;  i++)
+                        for (var iKey in iName)
+                            iResult = this[iType].set(iElement[i], iKey, iName[iKey]);
 
-            if ((_Type_(iStyle) == 'Number') || (! iStyle))
-                return iStyle;
-
-            var iNumber = iStyle.match(/(\d+(\.\d+)?)(px$)?/i);
-            iNumber = iNumber ? Number(iNumber[1]) : NaN;
-
-            return  isNaN(iNumber) ? iStyle : (iNumber / iScale);
-        },
-        set:          function (iElement, iName, iValue) {
-            if (_Type_(iElement) in Type_Info.DOM.root)  return false;
-
-            if (IE_CSS_Filter) {
-                var iString = '',  iWrapper,  iScale = 1,  iConvert;
-                if (typeof iValue == 'string')
-                    var iRGBA = iValue.match(/\s*rgba\(([^\)]+),\s*(\d\.\d+)\)/i);
-
-                if (iName == 'opacity') {
-                    iName = 'filter';
-                    iWrapper = 'progid:DXImageTransform.Microsoft.Alpha(opacity={n})';
-                    iScale = 100;
-                } else if (!! iRGBA) {
-                    iString = iValue.replace(iRGBA[0], '');
-                    if (iString)
-                        iString += arguments.callee(arguments[0], iName, iString);
-                    if (iName != 'background')
-                        iString += arguments.callee(
-                            arguments[0],
-                            (iName.indexOf('-color') > -1) ? iName : (iName + '-color'),
-                            'rgb(' + iRGBA[1] + ')'
-                        );
-                    iName = 'filter';
-                    iWrapper = 'progid:DXImageTransform.Microsoft.Gradient(startColorStr=#{n},endColorStr=#{n})';
-                    iConvert = function (iAlpha, iRGB) {
-                        return  toHexInt(parseFloat(iAlpha) * 256, 2) + RGB_Hex(iRGB);
-                    };
+                    return  iResult || iElement;
                 }
             }
+        };
 
-            if ((! isNaN( Number(iValue) )) && this.PX_Needed[iName])
-                iValue += 'px';
-            if (iWrapper)
-                iValue = iWrapper.replace(/\{n\}/g,  iConvert ?
-                      iConvert(iRGBA[2], iRGBA[1]) :
-                      (iValue * iScale)
-                );
-
-            if (iElement)
-                iElement.style[
-                    IE_CSS_Filter ? 'setAttribute' : 'setProperty'
-                ](
-                    iName,
-                    (_Browser_.msie != 9) ? iValue : iValue.toString(),
-                    'important'
-                );
-            else  return [
-                    iString ? (iString + ";\n") : ''
-                ].concat([
-                    iName,  ':',  Code_Indent,  iValue
-                ]).join('');
+    /* ----- DOM Attribute ----- */
+    _DOM_.Attribute = {
+        get:      function (iElement, iName) {
+            return  (_Object_.type(iElement) in Type_Info.DOM.root) ?
+                    null : iElement.getAttribute(iName);
+        },
+        set:      function (iElement, iName, iValue) {
+            return  (_Object_.type(iElement) in Type_Info.DOM.root) ?
+                    false  :  iElement.setAttribute(iName, iValue);
+        },
+        clear:    function (iElement, iName) {
+            iElement.removeAttribute(iName);
         }
     };
 
-    var inVisible = {
-            display:       'none',
-            visibility:    'hidden',
-            width:         0
-        };
-
-    function is_Visible(iElement) {
-        var iStyle = _Operator_('Style', [iElement], [
-                'display',  'visibility',  'width'
-            ]);
-
-        for (var iKey in iStyle)
-            if (iStyle[iKey] == inVisible[iKey])
-                return false;
-        return true;
-    }
-
-
-    /* ----- DOM Attribute ----- */
-    _Get_Set_.Attribute = {
+    /* ----- DOM Property ----- */
+    _DOM_.Property = {
         alias:    {
             'class':    'className',
             'for':      'htmlFor'
         },
         get:      function (iElement, iName) {
-            return  (_Type_(iElement) in Type_Info.DOM.root) ?
-                null : iElement.getAttribute(_Browser_.modern ? iName : this.AttrName[iName]);
+            return  iElement[
+                    _Browser_.modern  ?  iName  :  (this.alias[iName] || iName)
+                ];
         },
         set:      function (iElement, iName, iValue) {
-            if (_Type_(iElement) in Type_Info.DOM.root)
-                return false;
+            iElement[this.alias[iName] || iName] = iValue;
+        }
+    };
 
-            if ((! _Browser_.modern) && this.alias[iName])
-                iElement[ this.alias[iName] ] = iValue;
+    /* ----- DOM Style ----- */
+    var Code_Indent = _Browser_.modern ? '' : ' '.repeat(4);
+
+    _DOM_.Style = {
+        get:           function (iElement, iName) {
+            if ((! iElement) || (_Object_.type(iElement) in Type_Info.DOM.root))
+                return null;
+
+            var iStyle = DOM.defaultView.getComputedStyle(iElement, null).getPropertyValue(iName);
+            var iNumber = parseFloat(iStyle);
+
+            return  isNaN(iNumber) ? iStyle : iNumber;
+        },
+        PX_Needed:     _inKey_(
+            'width',  'min-width',  'max-width',
+            'height', 'min-height', 'max-height',
+            'margin', 'padding',
+            'top',    'left',
+            'border-radius'
+        ),
+        Set_Method:    _Browser_.modern ? 'setProperty' : 'setAttribute',
+        set:           function (iElement, iName, iValue) {
+            if (_Object_.type(iElement) in Type_Info.DOM.root)  return false;
+
+            if ((! isNaN( Number(iValue) ))  &&  this.PX_Needed[iName])
+                iValue += 'px';
+
+            if (iElement)
+                iElement.style[this.Set_Method](iName, String(iValue), 'important');
             else
-                iElement.setAttribute(iName, iValue);
+                return  [iName, ':', Code_Indent, iValue].join('');
         }
     };
 
     /* ----- DOM Data ----- */
-    _Get_Set_.Data = {
+    _DOM_.Data = {
         _Data_:    [ ],
-        _Name_:    { },
         set:       function (iElement, iName, iValue) {
-            if (_Type_(iElement.dataIndex) != 'Number')
+            if (typeof iElement.dataIndex != 'number')
                 iElement.dataIndex = this._Data_.push({ }) - 1;
 
             this._Data_[iElement.dataIndex][iName] = iValue;
         },
         get:       function (iElement, iName) {
-            if (_Type_(iElement.dataIndex) != 'Number')
+            if (typeof iElement.dataIndex != 'number')
                 iElement.dataIndex = this._Data_.push({ }) - 1;
 
-            var iData = this._Data_[iElement.dataIndex][iName];
+            var iData =  (this._Data_[iElement.dataIndex] || { })[iName]  ||
+                    (iElement.dataset || { })[ iName.toCamelCase() ];
 
-            if (iData)
-                return iData;
-            else  try {
-                return  _Operator_('Attribute', [iElement],  'data-' + iName);
-            } catch (iError) {
-                return null;
-            }
+            if (typeof iData == 'string')  try {
+                iData = BOM.JSON.parseAll(iData);
+            } catch (iError) { }
+
+            return  ((iData instanceof Array)  ||  _Object_.isPlainObject(iData))  ?
+                    _Object_.extend(true, undefined, iData)  :  iData;
         },
-        clear:     function (iElement) {
-            if (_Type_(iElement.dataIndex) == 'Number')
-                this._Data_[iElement.dataIndex] = null;
+        clear:     function (iElement, iName) {
+            if (typeof iElement.dataIndex != 'number')  return;
+
+            if (iName)
+                delete this._Data_[iElement.dataIndex][iName];
+            else {
+                delete this._Data_[iElement.dataIndex];
+                delete iElement.dataIndex;
+            }
         },
         clone:     function (iOld, iNew) {
             iNew.dataIndex = this._Data_.push({ }) - 1;
-            _Extend_(this._Data_[iNew.dataIndex], this._Data_[iOld.dataIndex]);
+            return _Object_.extend(
+                    this._Data_[iNew.dataIndex],
+                    this._Data_[iOld.dataIndex]
+                )._event_;
         }
     };
 
-/* ----- DOM Event ----- */
+    /* ----- DOM Content ----- */
+    _DOM_.innerText = {
+        set:    function (iElement, iText) {
+            switch ( iElement.tagName.toLowerCase() ) {
+                case 'style':     if (! _Browser_.modern) {
+                    iElement.styleSheet.cssText = iText;
+                    return;
+                }
+                case 'script':    if (! _Browser_.modern) {
+                    iElement.text = iText;
+                    return;
+                }
+                case '':          {
+                    iElement.appendChild( DOM.createTextNode(iText) );
+                    return;
+                }
+            }
+            iElement[_Browser_.ff ? 'textContent' : 'innerText'] = iText;
+        },
+        get:    _Browser_.ff ?
+            function (iElement) {
+                var TextRange = iElement.ownerDocument.createRange();
+                TextRange.selectNodeContents(iElement);
+                return TextRange.toString();
+            } :
+            function (iElement) {
+                return iElement.innerText;
+            }
+    };
+
+    _DOM_.innerHTML = {
+        set:    function (iElement, iHTML) {
+            var IE_Scope = String(iHTML).match(
+                    /^[^<]*<\s*(head|meta|title|link|style|script|noscript|(!--[^>]*--))[^>]*>/i
+                );
+
+            if (_Browser_.modern || (! IE_Scope))
+                iElement.innerHTML = iHTML;
+            else {
+                iElement.innerHTML = 'IE_Scope' + iHTML;
+                var iChild = iElement.childNodes;
+                iChild[0].nodeValue = iChild[0].nodeValue.slice(8);
+                if (! iChild[0].nodeValue.length)
+                    iElement.removeChild(iChild[0]);
+            }
+
+            return iElement.childNodes;
+        }
+    };
+
+    /* ----- DOM Offset ----- */
+    function DOM_Offset() {
+        var iOffset = {
+                left:    this[0].offsetLeft,
+                top:     this[0].offsetTop
+            };
+
+        Object_Seek.call(this[0], 'offsetParent', function () {
+            iOffset.left += this.offsetLeft;
+            iOffset.top += this.offsetTop;
+        });
+
+        return iOffset;
+    }
+
+
+/* ---------- DOM Event ---------- */
+    _DOM_.operate('Data',  [BOM],  '_timer_',  { });
+
     var _Time_ = {
             _Root_:     BOM,
             now:        Date.now,
@@ -552,439 +626,421 @@ self.onerror = function () {
                     return false;
                 });
             },
-            _Timer_:    { },
-            start:      function () {
-                return  this._Timer_[arguments[0]] = this.now();
+            start:      function (iName) {
+                var _This_ = this,  Time_Stamp;
+
+                _DOM_.operate('Data', [BOM], '_timer_',  function (_Index_, iTimer) {
+                    iTimer = iTimer || { };
+                    Time_Stamp = iTimer[iName] = _This_.now();
+                    return iTimer;
+                });
+
+                return Time_Stamp;
             },
             end:        function () {
-                return  (this.now() - this._Timer_[arguments[0]]) / 1000;
-            }
-        };
-
-    /* ----- W3C Event Method Wrapper ----- */
-    if (! _Browser_.modern) {
-        _Get_Set_.Data._Name_.event_ie = true;
-
-        function IE_Event_Handler(iElement, iCallback) {
-            return  function () {
-                    var iEvent = _Extend_(
-                            new (function HTMLEvent () {})(),
-                            BOM.event
-                        ),
-                        Loaded;
-
-                    switch (iEvent.type) {
-                        case 'readystatechange':    ;
-//                            Loaded = iElement.readyState.match(/loaded|complete/);  break;
-                        case 'load':
-                            Loaded = (iElement.readyState == 'loaded');  break;
-                        case 'propertychange':
-                            if ( _Operator_('Data', [iElement], 'custom-event') )
-                                iEvent.type = iEvent.propertyName.replace(/^on/i, '').toLowerCase();
-                        default:
-                            Loaded = true;
-                    }
-                    if (! Loaded)  return;
-
-                    iCallback.call(iElement, _Extend_(iEvent, {
-                        target:           iEvent.srcElement,
-                        which:            (iEvent.type.slice(0, 3) == 'key') ?
-                            iEvent.keyCode  :  [0, 1, 3, 0, 2, 0, 0, 0][iEvent.button],
-                        relatedTarget:    ({
-                            mouseover:     iEvent.fromElement,
-                            mouseout:      iEvent.toElement,
-                            mouseenter:    iEvent.fromElement || iEvent.toElement,
-                            mouseleave:    iEvent.toElement || iEvent.fromElement
-                        })[iEvent.type]
-                    }));
-                };
-        }
-    }
-
-    var _Event_ = _Browser_.modern ? {
-            bind:      function (iElement, iType, iCallback) {
-                iElement.addEventListener(iType, iCallback, false);
+                var iTimer = _DOM_.operate('Data', [BOM], '_timer_');
+                return  (this.now() - iTimer[arguments[0]]) / 1000;
             },
-            unbind:    function (iElement, iType, iCallback) {
-                iElement.removeEventListener(iType, iCallback, false);
-            },
-            trig:      function () {
-                var iEvent = DOM.createEvent('HTMLEvents');
-                iEvent.initEvent(arguments[1], true, true);
-                arguments[0].dispatchEvent(iEvent);
-            }
-        } : {
-            bind:      function (iElement, iType, iCallback) {
-                var This_DOM = (_Type_(iElement) == 'Document') ?
-                        iElement : (iElement.ownerDocument || iElement.document);
-
-                //  Custom DOM Event
-                if (Type_Info.DOM_Event.indexOf(iType) == -1) {
-                    if (! _Operator_('Data', [iElement], 'custom-event')) {
-                        _Operator_('Data', [iElement], 'custom-event', true);
-                        iType = 'propertychange';
-                    } else  iType = '';
-
-                    if (! _Operator_('Attribute',  [iElement],  'on' + iType))
-                        _Operator_('Attribute',  [iElement],  'on' + iType,  _Time_.now());
-                }
-
-                //  Patch to W3C DOM Event
-                if (iCallback && (iType == 'DOMContentLoaded')) {
-                    if (BOM !== BOM.top)  iType = 'load';
-                    else {
-                        _Time_.every(0.01, function () {
-                            try {
-                                This_DOM.documentElement.doScroll('left');
-                                iCallback.call(This_DOM, BOM.event);
-                                return false;
-                            } catch (Err) {
-                                return;
-                            }
-                        });
-                        return;
-                    }
-                }
-                if ((_Type_(iElement) != 'Window') && (iType == 'load'))
-                    iType = 'readystatechange';
-
-                if (! iType)  return;
-
-                //  Event Handler Patch
-                var _Handler_ = _Operator_('Data', [iElement], 'event_ie');
-
-                if (! _Handler_) {
-                    _Handler_ = IE_Event_Handler(iElement, iCallback);
-                    _Operator_('Data', [iElement], 'event_ie', _Handler_);
-                }
-                iElement[
-                    (iCallback ? 'at' : 'de') + 'tachEvent'
-                ]('on' + iType,  _Handler_);
-            },
-            unbind:    function () {
-                this.bind(arguments[0], arguments[1]);
-            },
-            trig:      function (iElement, iType) {
-                iType = iType.toLowerCase();
-
-                if (Type_Info.DOM_Event.indexOf(iType) > -1) {
-                    var iEvent = DOM.createEventObject();
-                    iEvent.type = 'on' + iType;
-                    iElement.fireEvent(iEvent.type, iEvent);
-                } else
-                    _Operator_('Attribute',  iElement,  'on' + iType,  _Time_.now());
+            guid:       function () {
+                return  [
+                        (arguments[0] || 'guid'),  '_',
+                        this.now().toString(16),
+                        Math.random().toString(16).slice(2)
+                    ].join('');
             }
         };
 
     /* ----- Event Proxy Layer ----- */
-    _Get_Set_.Data._Name_.event = true;
+    function Event_Trigger(iType, iName, iData) {
+        _DOM_.operate('Data', this, '_trigger_', iData);
+
+        for (var i = 0, iEvent;  i < this.length;  i++) {
+            iEvent = DOM.createEvent(iType);
+            iEvent[
+                'init' + (
+                    (iType == 'HTMLEvents') ? 'Event' : iType
+                )
+            ](iName, true, true, 0);
+            this[i].dispatchEvent(iEvent);
+        }
+
+        return this;
+    }
 
     function Proxy_Handler(iEvent) {
-        var iHandler = _Operator_('Data', [this], 'event')[iEvent.type],
+        var iHandler = (_DOM_.operate('Data', [this], '_event_') || { })[iEvent.type];
+        if (! iHandler)  return;
+
+        var Trigger_Data = _DOM_.operate('Data', [this], '_trigger_'),
             iReturn;
 
         for (var i = 0, _Return_;  i < iHandler.length;  i++) {
-            _Return_ = iHandler[i].apply(this, arguments);
-            if (typeof _Return_ == 'undefined')
-                iReturn = _Return_;
+            if ( iHandler[i] )
+                _Return_ = iHandler[i].apply(
+                    this,  _Object_.makeArray(arguments).concat(Trigger_Data)
+                );
+            else if (iHandler[i] === false)
+                _Return_ = false;
+            else
+                continue;
+
+            if (iReturn !== false)  iReturn = _Return_;
         }
 
-        return iReturn;
-    }
+        _DOM_.operate('Data', [this], '_trigger_', null);
 
-    function Event_Switch(iElement, iType, iCallback) {
-        if (iType.indexOf('DOM') != 0)
-            iType = iType.toLowerCase();
-
-        var Event_Data = _Operator_('Data', [iElement], 'event');
-        if (! Event_Data)
-            Event_Data = { };
-
-        if (! Event_Data[iType]) {
-            Event_Data[iType] = [ ];
-            _Event_.bind(iElement, iType, Proxy_Handler);
+        if (iReturn === false) {
+            iEvent.preventDefault();
+            iEvent.stopPropagation();
         }
+    }
 
-        if (iCallback)
-            Event_Data[iType].push( iCallback );
-        else {
-            Event_Data[iType] = null;
-            _Event_.unbind(iElement, iType, Proxy_Handler);
-        }
+/* ---------- DOM Traversal ---------- */
+    function _Parents_() {
+        var _GUID_ = _Time_.guid('parent');
 
-        _Operator_('Data', [iElement], 'event', Event_Data);
+        for (var i = 0;  i < this.length;  i++)
+            Object_Seek.call(this[i],  'parentNode',  function () {
+                _DOM_.operate('Attribute',  [this],  _GUID_,  function (_Index_, iTimes) {
+                    return  iTimes ? (parseInt(iTimes) + 1) : 1
+                });
+            });
+
+        return _GUID_;
     }
 
 
-    /* ----- DOM Ready ----- */
-    _Operator_('Data', [DOM], 'event', {
-        ready:    [ ],
-    });
-    _Get_Set_.Data._Name_.Ready_Timer = true;
-    _Time_.start('DOM_Ready');
-
-    function DOM_Ready_Event() {
-        if (DOM.isReady) return;
-
-        var _DOM_Ready_ = (DOM.readyState == 'complete') &&
-                DOM.body  &&  DOM.body.lastChild  &&  DOM.getElementById;
-
-        if ((this !== DOM) && (! _DOM_Ready_))
-            return;
-
-        DOM.isReady = true;
-        BOM.clearTimeout(
-            _Operator_('Data', [DOM], 'Ready_Timer')
-        );
-        _Operator_('Data', [DOM], 'Load_During', _Time_.end('DOM_Ready'));
-        _Operator_('Data', [DOM], 'Ready_Event', arguments[0]);
-        console.info('[DOM Ready Event]');
-        console.log(this, arguments);
-
-        var iHandler = _Operator_('Data', [DOM], 'event').ready;
-        for (var i = 0;  i < iHandler.length;  i++)
-            iHandler[i].apply(DOM, arguments);
-
-        return false;
-    }
-
-    _Operator_(
-        'Data',  [DOM],  'Ready_Timer',  _Time_.every(0.5, DOM_Ready_Event)
-    );
-    _Event_.bind(DOM, 'DOMContentLoaded', DOM_Ready_Event);
-    _Event_.bind(BOM, 'load', DOM_Ready_Event);
-
-
-
-/* ----- DOM Constructor ----- */
+/* ---------- DOM Constructor ---------- */
     function DOM_Create(TagName, AttrList) {
-        var iNew;
+        var iNew,  iTag = TagName.match(/^\s*<(.+?)\s*\/?>([\s\S]+)?/);
 
-        if (TagName[0] == '<') {
-            if (! TagName.match(/^<style[^\w]+/i)) {
-                iNew = DOM.createElement('div');
-                iNew.innerHTML = TagName;
-                if (iNew.children.length > 1)
-                    return iNew.children;
-                else
-                    iNew = iNew.children[0];
-            } else
-                TagName = 'style';
-        }
-        if (! iNew)
-            iNew = DOM.createElement(TagName);
+        if (! iTag)  return  [ DOM.createTextNode(TagName) ];
+
+        if (iTag[2]  ||  (iTag[1].split(/\s/).length > 1)) {
+            iNew = _DOM_.innerHTML.set(
+                DOM.createElement('div'),  TagName
+            );
+
+            if ((iNew.length != 1)  ||  (iNew[0].nodeType != 1))
+                return iNew;
+        } else
+            iNew = [ DOM.createElement( iTag[1] ) ];
 
         if (AttrList)  for (var AK in AttrList) {
             var iValue = AttrList[AK];
             try {
                 switch (AK) {
-                    case 'text':     {
-                        if (TagName == 'style') {
-                            if (! _Browser_.modern)
-                                iNew.styleSheet.cssText = iValue;
-                            else
-                                iNew.appendChild( DOM.createTextNode(iValue) );
-                        } else
-                            iNew.innerText = iValue;
-                    }  break;
-                    case 'html':
-                        iNew.innerHTML = iValue;  break;
-                    case 'style':    if (_Type_(iValue) == 'Object') {
-                        _Type_(iNew, iValue);
+                    case 'text':     _DOM_.innerText.set(iNew[0], iValue);  break;
+                    case 'html':     _DOM_.innerHTML.set(iNew[0], iValue);  break;
+                    case 'style':    if (_Object_.type(iValue) == 'Object') {
+                        _DOM_.operate('Style', iNew, iValue);
                         break;
                     }
-                    default:         {
-                        if (! AK.match(/^on\w+/))
-                            _Operator_('Attribute', [iNew], AK, iValue);
-                        else
-                            _Event_.bind(iNew, AK.slice(2), iValue);
-                    }
+                    default:         _DOM_.operate('Attribute', iNew, AK, iValue);
                 }
-            } catch (iError) { }
+            } catch (iError) {
+                console.error(iError);
+            }
         }
 
         return iNew;
     }
 
 
-/* ----- AJAX Module ----- */
-    if (_Browser_.msie < 9)
-        var IE_DOMParser = (function (MS_Version) {
-                for (var i = 0; i < MS_Version.length; i++)  try {
-                    new ActiveXObject( MS_Version[i] );
-                    return MS_Version[i];
-                } catch (iError) { }
-            })([
-                'MSXML2.DOMDocument.6.0',
-                'MSXML2.DOMDocument.5.0',
-                'MSXML2.DOMDocument.4.0',
-                'MSXML2.DOMDocument.3.0',
-                'MSXML2.DOMDocument',
-                'Microsoft.XMLDOM'
-            ]);
+/* ---------- DOM Selector ---------- */
+    var iPseudo = {
+            ':header':     {
+                filter:    function () {
+                    return  (arguments[0] instanceof HTMLHeadingElement);
+                }
+            },
+            ':image':      {
+                feature:    _Object_.extend(_inKey_('img', 'svg', 'canvas'), {
+                    input:    {type:  'image'},
+                    link:     {type:  'image/x-icon'}
+                }),
+                filter:    function (iElement) {
+                    var iTag = iElement.tagName.toLowerCase();
 
-    function XML_Parse(iString) {
-        iString = iString.trim();
-        if ((iString[0] != '<') || (iString[iString.length - 1] != '>'))
-            throw 'Illegal XML Format...';
+                    if (iTag in this.feature)
+                        return  (this.feature[iTag] instanceof Boolean) ? true : (
+                            this.feature[iTag].type == iElement.type.toLowerCase()
+                        );
+                }
+            },
+            ':button':     {
+                feature:    _inKey_('button', 'image', 'submit', 'reset'),
+                filter:     function (iElement) {
+                    var iTag = iElement.tagName.toLowerCase();
 
-        var iXML;
+                    return  ((iTag == 'button') || (
+                        (iTag == 'input') &&
+                        (iElement.type.toLowerCase() in this.feature)
+                    ));
+                }
+            },
+            ':input':      {
+                feature:    _inKey_('input', 'textarea', 'button', 'select'),
+                filter:     function () {
+                    return  (arguments[0].tagName.toLowerCase() in this.feature);
+                }
+            },
+            ':list':       {
+                feature:    _inKey_('ul', 'ol', 'dl'),
+                filter:     function () {
+                    return  (arguments[0].tagName.toLowerCase() in this.feature);
+                }
+            },
+            ':data':       {
+                filter:    function () {
+                    return  (! _Object_.isEmptyObject(arguments[0].dataset));
+                }
+            },
+            ':visible':    {
+                feature:    {
+                    display:    'none',
+                    width:      0,
+                    height:     0
+                },
+                filter:     function (iElement) {
+                    var iStyle = _DOM_.operate('Style', [iElement], [
+                            'display', 'width', 'height'
+                        ]);
 
-        if (DOMParser) {
-            iXML = (new DOMParser()).parseFromString(iString, 'text/xml');
-            var iError = iXML.getElementsByTagName('parsererror');
-            if (iError.length) {
-                throw  new SyntaxError(1, 'Incorrect XML Syntax !');
-                console.log(iError[0]);
+                    for (var iKey in iStyle)
+                        if (iStyle[iKey] === this.feature[iKey])
+                            return;
+                    return true;
+                }
+            },
+            ':parent':      {
+                filter:    function () {
+                    var iNode = arguments[0].childNodes;
+
+                    if (! arguments[0].children.length) {
+                        for (var i = 0;  i < iNode.length;  i++)
+                            if (iNode[i].nodeType == 3)
+                                return true;
+                    } else  return true;
+                }
             }
-        } else {
-            iXML = new ActiveXObject( IE_DOMParser );
-            iXML.async = false;
-            iXML.loadXML(iString);
-            if (iXML.parseError.errorCode) {
-                throw  new SyntaxError(iXML.parseError, 'Incorrect XML Syntax !');
-                console.log(iXML.parseError.reason);
+        };
+
+    _Object_.extend(iPseudo, {
+        ':hidden':    {
+            filter:    function () {
+                return  (! iPseudo[':visible'].filter(arguments[0]));
+            }
+        },
+        ':empty':     {
+            filter:    function () {
+                return  (! iPseudo[':parent'].filter(arguments[0]));
             }
         }
-        return iXML;
-    }
+    });
 
-    function X_Domain(Target_URL) {
-        var iLocation = BOM.location;
-        Target_URL = Target_URL.match(/^(\w+?(s)?:)?\/\/([\w\d:]+@)?([^\/\:\@]+)(:(\d+))?/);
+    for (var _Pseudo_ in iPseudo)
+        iPseudo[_Pseudo_].regexp = BOM.iRegExp(
+            '(.*?)' + _Pseudo_ + "([>\\+~\\s]*.*)",  undefined,  null
+        );
 
-        if (! Target_URL)  return false;
-        if (Target_URL[1] && (Target_URL[1] != iLocation.protocol))  return true;
-        if (Target_URL[4] && (Target_URL[4] != iLocation.hostname))  return true;
-        var iPort = iLocation.port || (
-                (iLocation.protocol == 'http:') && 80
-            ) || (
-                (iLocation.protocol == 'https:') && 443
-            );
-        if (Target_URL[6] && (Target_URL[6] != iPort))  return true;
-    }
+    function DOM_Search(iRoot, iSelector) {
+        var _Self_ = arguments.callee,  iSet = [ ];
 
-    function iAJAX(This_Call, X_Domain) {
-        var iXDR = (X_Domain && (_Browser_.msie < 10));
-        var iXHR = new BOM[iXDR ? 'XDomainRequest' : 'XMLHttpRequest']();
-
-        var _Open_ = iXHR.open;
-        iXHR.open = function () {
-            var _This_ = this;
-
-            _This_[
-                X_Domain ? 'onload' : 'onreadystatechange'
-            ] = function () {
-                if (! (X_Domain || (_This_.readyState == 4)))  return;
-
-                iXHR.onready.call(iXHR, iXHR.responseAny());
-                iXHR = null;
-            };
-            _Open_.apply(_This_, arguments);
-        };
-        if (iXDR)
-            iXHR.setRequestHeader = function () {
-                console.warn("IE 8/9 XDR doesn't support Changing HTTP Headers...");
-            };
-
-        return  _Extend_(iXHR, {
-                responseAny:    function () {
-                    var iResponse = this.responseText.trim();
-
-                    try {
-                        iResponse = BOM.JSON.parseAll(iResponse);
-                    } catch (iError) {
-                        try {
-                            iResponse = XML_Parse(iResponse);
-                        } catch (iError) { }
-                    }
-
-                    return iResponse;
-                },
-                timeOut:        function (TimeOut_Seconds, TimeOut_Callback) {
-                    var iXHR = this;
-
-                    _Time_.wait(TimeOut_Seconds, function () {
-                        iXHR.onreadystatechange = null;
-                        iXHR.abort();
-                        TimeOut_Callback.call(iXHR);
-                    });
-                },
-                retry:    function (Wait_Seconds) {
-                    _Time_.wait(Wait_Seconds, function () {
-                        This_Call.callee.apply(BOM, This_Call);
-                    });
+        _Object_.each(iSelector.split(/\s*,\s*/),  function () {
+            try {
+                iSet = Array_Concat(iSet,  iRoot.querySelectorAll(arguments[1] || '*'));
+            } catch (iError) {
+                var _Selector_;
+                for (var _Pseudo_ in iPseudo) {
+                    _Selector_ = arguments[1].match(iPseudo[_Pseudo_].regexp);
+                    if (_Selector_ && (_Selector_.length > 1))
+                        break;
                 }
-            });
+                var Set_0 = _Self_(
+                        iRoot,  _Selector_[1] + (_Selector_[1].match(/[\s>\+~]\s*$/) ? '*' : '')
+                    ),
+                    Set_1 = [ ];
+                for (var i = 0;  i < Set_0.length;  i++)
+                    if ( iPseudo[_Pseudo_].filter(Set_0[i]) ) {
+                        if (_Selector_[2])
+                            Set_1 = Set_1.concat(
+                                _Self_(Set_0[i],  '*' + _Selector_[2])
+                            );
+                        else
+                            Set_1.push(Set_0[i]);
+                    }
+                for (var i = Set_1.length - 1;  i > 0;  i--)
+                    if (Set_1.indexOf(Set_1[i]) < i)
+                        Set_1[i] = null;
+
+                iSet = iSet.concat(Set_1);
+            }
+        });
+
+        return iSet;
     }
 
 
 /* ---------- jQuery API ---------- */
-    BOM.iQuery = function () {
+    BOM.iQuery = function (Element_Set, iContext) {
         /* ----- Global Wrapper ----- */
         var _Self_ = arguments.callee;
-        var iArgs = _Extend_([ ], arguments);
 
         if (! (this instanceof _Self_))
-            return  new _Self_(iArgs[0], iArgs[1]);
-        if (iArgs[0] instanceof _Self_)
-            return  iArgs[0];
+            return  new _Self_(Element_Set, iContext);
+        if (Element_Set instanceof _Self_)
+            return  Element_Set;
 
         /* ----- Constructor ----- */
         this.length = 0;
-        this.context = DOM;
 
-        if (! iArgs[0]) return;
+        if (! Element_Set) return;
 
-        if (_Type_(iArgs[0]) == 'String') {
-            if ((iArgs[0][0] != '<') && (_Type_(iArgs[1]) != 'Object')) {
-                this.context = iArgs[1] || this.context;
-                try {
-                    this.add(
-                        this.context.querySelectorAll(iArgs[0])
-                    );
-                } catch (iError) { }
-                this.selector = iArgs[0];
+        if (typeof Element_Set == 'string') {
+            if (Element_Set[0] != '<') {
+                this.context = iContext || DOM;
+                this.selector = Element_Set;
+                Element_Set = DOM_Search(this.context, Element_Set);
             } else
-                this.add( DOM_Create(iArgs[0], iArgs[1]) );
-        } else
-            this.add( iArgs[0] );
+                Element_Set = DOM_Create(
+                    Element_Set,  _Object_.isPlainObject(iContext) && iContext
+                );
+        }
+        this.add( Element_Set );
     };
 
     var $ = BOM.iQuery;
     $.fn = $.prototype;
+
+    $.fn.add = function (Element_Set) {
+        var iType = _Object_.type(Element_Set);
+
+        if (iType == 'String')
+            Element_Set = $(Element_Set, arguments[1]);
+        else if (iType in Type_Info.DOM.element)
+            Element_Set = [ Element_Set ];
+
+        if (typeof Element_Set.length == 'number') {
+            for (var i = 0;  i < Element_Set.length;  i++)
+                if (Element_Set[i] && (
+                    (Element_Set[i].nodeType == 1) ||
+                    (_Object_.type(Element_Set[i]) in Type_Info.DOM.root)
+                ))
+                    Array.prototype.push.call(this, Element_Set[i]);
+
+            if (this.length == 1)
+                this.context = this[0].ownerDocument;
+        }
+
+        return this;
+    };
 
     if (typeof BOM.jQuery != 'function') {
         BOM.jQuery = BOM.iQuery;
         BOM.$ = $;
     }
 
-
     /* ----- iQuery Static Method ----- */
-    _Extend_($, {
+    _Object_.extend($, _Object_, _Time_, {
         browser:          _Browser_,
-        type:             _Type_,
-        isPlainObject:    function () {
-            return  (arguments[0].constructor === Object);
+        isData:           function () {
+            return  (this.type(arguments[0]) in Type_Info.Data);
         },
-        isEmptyObject:    function () {
-            for (var iKey in arguments[0])
+        isSelector:       function () {
+            try {
+                DOM.querySelector(arguments[0])
+            } catch (iError) {
                 return false;
+            }
             return true;
         },
-        extend:           _Extend_,
-        makeArray:        function () {
-            return  this.extend([ ], arguments[0]);
-        },
         inArray:          function () {
-            return  [ ].indexOf.call(arguments[0], arguments[1]);
+            return  Array.prototype.indexOf.call(arguments[0], arguments[1]);
         },
-        each:             function (ArrObj) {
-            for (var i = 0, iReturn;  i < ArrObj.length;  i++) {
-                iReturn = arguments[1].call(ArrObj[i], i, ArrObj[i]);
-                if ((this.type(iReturn) != 'Undefined') && (! iReturn))
-                    break;
+        map:              function () {
+            return  Array.prototype.map.call(arguments[0], arguments[1]);
+        },
+        trim:             function () {
+            return  arguments[0].trim();
+        },
+        split:            function (iString, iSplit, iLimit, iJoin) {
+            iString = iString.split(iSplit);
+            if (iLimit) {
+                iString[iLimit - 1] = iString.slice(iLimit - 1).join(
+                    (typeof iJoin == 'string') ? iJoin : iSplit
+                );
+                iString.length = iLimit;
             }
+            return iString;
+        },
+        parseJSON:        BOM.JSON.parse,
+        parseXML:         function (iString) {
+            iString = iString.trim();
+            if ((iString[0] != '<') || (iString[iString.length - 1] != '>'))
+                throw 'Illegal XML Format...';
+
+            var iXML = (new BOM.DOMParser()).parseFromString(iString, 'text/xml');
+            var iError = iXML.getElementsByTagName('parsererror');
+            if (iError.length) {
+                throw  new SyntaxError(1, 'Incorrect XML Syntax !');
+                console.log(iError[0]);
+            }
+            iXML.cookie;    //  for old WebKit core to throw Error
+
+            return iXML;
+        },
+        param:            function (iObject) {
+            var iParameter = [ ],  iValue;
+
+            if ( $.isPlainObject(iObject) )
+                for (var iName in iObject) {
+                    iValue = iObject[iName];
+
+                    if ( $.isPlainObject(iValue) )
+                        iValue = BOM.JSON.stringify(iValue);
+                    else if (! $.isData(iValue))
+                        continue;
+
+                    iParameter.push(iName + '=' + BOM.encodeURIComponent(iValue));
+                }
+            else if ($.type(iObject) in Type_Info.DOM.set)
+                for (var i = 0;  i < iObject.length;  i++)
+                    iParameter.push(
+                        iObject[i].name + '=' + BOM.encodeURIComponent(iObject[i].value)
+                    );
+
+            return iParameter.join('&');
+        },
+        paramJSON:        function (Args_Str) {
+            Args_Str = (Args_Str || BOM.location.search).match(/[^\?&\s]+/g);
+            if (! Args_Str)  return { };
+
+            var _Args_ = {
+                    toString:    function () {
+                        return  BOM.JSON.format(this);
+                    }
+                };
+
+            for (var i = 0, iValue; i < Args_Str.length; i++) {
+                Args_Str[i] = $.split(Args_Str[i], '=', 2);
+
+                iValue = BOM.decodeURIComponent( Args_Str[i][1] );
+                try {
+                    iValue = BOM.JSON.parse(iValue);
+                } catch (iError) { }
+
+                _Args_[ Args_Str[i][0] ] = iValue;
+            }
+
+            return  Args_Str.length ? _Args_ : { };
+        },
+        fileName:         function () {
+            return  (arguments[0] || BOM.location.pathname)
+                    .split('?')[0].split('/').slice(-1)[0];
+        },
+        data:             function (iElement, iName, iValue) {
+            return  _DOM_.operate('Data', [iElement], iName, iValue);
         },
         contains:         function (iParent, iChild) {
             if (! iChild)  return false;
@@ -993,129 +1049,53 @@ self.onerror = function () {
                 return  !!(iParent.compareDocumentPosition(iChild) & 16);
             else
                 return  (iParent !== iChild) && iParent.contains(iChild);
-        },
-        trim:             function () {
-            return  arguments[0].trim();
-        },
-        parseJSON:        BOM.JSON.parse,
-        parseXML:         XML_Parse,
-        param:            function (iObject) {
-            var iParameter = [ ];
-
-            if ( $.isPlainObject(iObject) ) {
-                for (var iName in iObject)
-                    if ($.type(iObject[iName]) in Type_Info.Data)
-                        iParameter.push(iName + '=' + iObject[iName]);
-            } else if (iObject instanceof $)
-                for (var i = 0;  i < iObject.length;  i++)
-                    iParameter.push(iObject[i].name + '=' + iObject[i].value);
-
-            return iParameter.join('&');
-        },
-        paramJSON:        function (Args_Str) {
-            Args_Str = (Args_Str || BOM.location.search).match(/^[^\?]*\?([^\s]+)$/);
-            if (! Args_Str)  return { };
-
-            var iArgs = Args_Str[1].split('&'),
-                _Args_ = {
-                    toString:    function () {
-                        return  BOM.JSON.format(this);
-                    }
-                };
-
-            for (var i = 0, iValue; i < iArgs.length; i++) {
-                iArgs[i] = iArgs[i].split('=');
-
-                iValue = BOM.decodeURIComponent(
-                    iArgs[i].slice(1).join('=')
-                );
-                try {
-                    iValue = BOM.JSON.parse(iValue);
-                } catch (iError) { }
-
-                _Args_[ iArgs[i][0] ] = iValue;
-            }
-
-            return  iArgs.length ? _Args_ : { };
-        },
-        data:             function (iElement, iName, iValue) {
-            if (iValue  &&  (iName in _Get_Set_.Data._Name_))
-                throw  'Name "' + iName + '" is only for Inner Using !';
-
-            return  _Operator_('Data', [iElement], iName, iValue);
         }
     });
 
-    _Extend_($, _Time_);
-
-    
-    
-    /* ----- HTTP Client ----- */
-    function iHTTP(iURL, iData, iCallback) {
-        var HTTP_Client = iAJAX(
-                arguments,
-                iCallback.name || X_Domain(iURL)
-            );
-        HTTP_Client.onready = iCallback;
-        HTTP_Client.open(iData ? 'POST' : 'GET', iURL, true);
-        if (iData)
-            HTTP_Client.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-//        HTTP_Client.setRequestHeader('If-Modified-Since', 0);
-        HTTP_Client.send(
-            (typeof iData == 'string') ?
-                iData : BOM.encodeURI( $.param(iData || { }) )
-        );
-
-        return HTTP_Client;
-    }
-
-    _Extend_($, {
-        get:     function (iURL, iData, iCallback) {
-            iURL = iURL.split('?')[0] + '?' + $.param(
-                $.extend($.paramJSON(iURL),  iData,  {_:  $.now()})
-            );
-            return  iHTTP(iURL, null, iCallback);
-        },
-        post:    iHTTP
-    });
-
     /* ----- iQuery Instance Method ----- */
-    _Extend_($.fn, {
-        splice:         [ ].splice,
-        add:            function () {
-            var iArgs = $.makeArray(arguments);
-            var iArgType = $.type(iArgs[0]);
+    function DOM_Scroll(iName) {
+        iName = {
+            scroll:    'scroll' + iName,
+            offset:    (iName == 'Top') ? 'pageYOffset' : 'pageXOffset'
+        };
 
-            if (iArgType == 'String') {
-                iArgs[0] = $(iArgs[0], iArgs[1]);
-                iArgType = 'iQuery';
-            }
-            if (iArgType in Type_Info.DOM.set) {
-                for (var i = 0;  i < iArgs[0].length;  i++)
-                    if ( iArgs[0][i] )
-                        [ ].push.call(this, iArgs[0][i]);
-            } else if (iArgType in Type_Info.DOM.element)
-                [ ].push.call(this, iArgs[0]);
+        return  function (iPX) {
+            iPX = parseInt(iPX);
 
-            return this;
-        },
-        jquery:         '1.9.1',
-        iquery:         '1.0',
-        eq:             function () {
-            var $_This = this;
-
-            return  $.extend(
-                    $( this[arguments[0]] ),
-                    {prevObject:  $_This}
+            if ( isNaN(iPX) ) {
+                iPX = this[0][iName.scroll];
+                return  (iPX !== undefined) ? iPX : (
+                    this[0].documentElement[iName.scroll] ||
+                    this[0].defaultView[iName.offset] ||
+                    this[0].body[iName.scroll]
                 );
+            }
+            for (var i = 0;  i < this.length;  i++)
+                if (this[i][iName.scroll] !== undefined)
+                    this[i][iName.scroll] = iPX;
+                else
+                    this[i].documentElement[iName.scroll] =
+                    this[i].defaultView[iName.offset] =
+                    this[i].body[iName.scroll] = iPX;
+        };
+    }
+    $.fn.extend = $.extend;
+
+    $.fn.extend({
+        splice:             Array.prototype.splice,
+        jquery:             '1.9.1',
+        iquery:             '1.0',
+        pushStack:          function () {
+            var $_New = $(arguments[0]);
+            $_New.prevObject = this;
+            return $_New;
         },
-        index:          function (iTarget) {
+        eq:                 function () {
+            return  this.pushStack( this[arguments[0]] );
+        },
+        index:              function (iTarget) {
             if (! iTarget)
-                return
-                    Back_Track.call(
-                        this[0],
-                        ($.browser.msie < 9) ? 'prevSibling' : 'prevElementSibling'
-                    ).length;
+                return  Object_Seek.call(this[0], 'previousElementSibling').length;
 
             var iType = $.type(iTarget);
             switch (true) {
@@ -1130,20 +1110,18 @@ self.onerror = function () {
             }
             return -1;
         },
-        slice:          function () {
-            var $_This = this;
-
-            return  $.extend(
-                    $( [ ].slice.apply($_This, arguments) ),
-                    {prevObject:  $_This}
-                );
+        slice:              function () {
+            return  this.pushStack( [ ].slice.apply(this, arguments) );
         },
-        each:           function () {
-            $.each(this, arguments[0]);
-
-            return this;
+        each:               function () {
+            return  $.each(this, arguments[0]);
         },
-        is:             function (iSelector) {
+        map:                function (iCallback) {
+            return  $($.map(this,  function () {
+                return  iCallback.call(arguments[0], arguments[1], arguments[0]);
+            }));
+        },
+        is:                 function (iSelector) {
             return  (
                     $.inArray(
                         $(iSelector,  this[0] && this[0].parentNode),
@@ -1151,139 +1129,206 @@ self.onerror = function () {
                     ) > -1
                 );
         },
-        filter:         function (iSelector) {
-            var $_This = this,
-                $_Filter = $(iSelector),
-                iVisible = iSelector && iSelector.trim().match(/(\s?):visible$/),
+        filter:             function (iSelector) {
+            var $_Filter = $(iSelector),
                 $_Result = [ ];
 
-            if (iVisible)  iVisible = iVisible[1] ? 2 : 1;
+            if ( $_Filter.length ) {
+                for (var i = 0;  i < this.length;  i++)
+                    if ($.inArray($_Filter, this[i]) > -1)
+                        $_Result.push( this[i] );
+            }
 
-            if ( $_Filter.length )
-                for (var i = 0;  i < $_This.length;  i++)
-                    if ($.inArray($_Filter, $_This[i]) > -1) {
-                        if (iVisible && (! is_Visible($_This[i])))
-                            continue;
-                        $_Result.push( $_This[i] );
-                    }
-
-            return  $.extend($($_Result), {prevObject:  $_This});
+            return this.pushStack($_Result);
         },
-        attr:           function () {
-            var iResult = _Operator_('Attribute', this, arguments[0], arguments[1]);
-            return  (typeof iResult == 'undefined') ? this : iResult;
+        not:                function () {
+            var $_Not = $(arguments[0]),
+                $_Result = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                if ($.inArray($_Not, this[i]) < 0)
+                    $_Result.push(this[i]);
+
+            return this.pushStack($_Result);
         },
-        data:           function () {
-            var iResult = _Operator_('Data', this, arguments[0], arguments[1]);
-            return  (typeof iResult == 'undefined') ? this : iResult;
+        attr:               function () {
+            return  _DOM_.operate('Attribute', this, arguments[0], arguments[1]);
         },
-        parent:         function () {
-            var $_This = this,  $_Result = [ ];
+        removeAttr:         function (iAttr) {
+            iAttr = iAttr.trim().split(/\s+/);
 
-            for (var i = 0;  i < $_This.length;  i++)
-                if ($.inArray($_Result, $_This[i].parentNode) == -1)
-                    $_Result.push( $_This[i].parentNode );
+            for (var i = 0;  i < iAttr.length;  i++)
+                this.attr(iAttr[i], null);
 
-            $_Result = $($_Result);
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
-
-            return  $.extend($_Result, {prevObject:  $_This});
+            return this;
         },
-        parents:        function () {
-            var $_This = this,  _UID_ = $.now();
+        prop:               function () {
+            return  _DOM_.operate('Property', this, arguments[0], arguments[1]);
+        },
+        data:               function () {
+            return  _DOM_.operate('Data', this, arguments[0], arguments[1]);
+        },
+        addBack:            function () {
+            var _GUID_ = $.guid();
 
-            for (var i = 0;  i < $_This.length;  i++)
-                $( Back_Track.call($_This[i], 'parentNode') )
-                    .data('iQuery', _UID_);
+            var $_Result = $(
+                    Array_Concat(this, this.prevObject)
+                ).attr('iquery', _GUID_);
 
-            var $_Result = $('*[iQuery="' + _UID_ + '"]');
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
-
-            return  $.extend(
-                    [ ].reverse.call($_Result),
-                    {prevObject:  $_This}
+            return  this.pushStack(
+                    $('*[iquery="' + _GUID_ + '"]').removeAttr('iquery')
                 );
         },
-        children:       function () {
-            var $_This = this,  $_Result = [ ];
+        parent:             function () {
+            var $_Result = [ ];
 
-            for (var i = 0;  i < $_This.length;  i++)
-                $_Result = $_Result.concat(
-                    $.makeArray( $_This[i].children )
-                );
+            for (var i = 0;  i < this.length;  i++)
+                if ($.inArray($_Result, this[i].parentNode) == -1)
+                    $_Result.push( this[i].parentNode );
 
-            $_Result = $($_Result);
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
 
-            return  $.extend($_Result, {prevObject:  $_This});
+            return this.pushStack($_Result);
         },
-        contents:       function () {
-            var $_This = this,  $_Result = [ ],
+        parents:            function () {
+            var _GUID_ = _Parents_.call(this);
+            var $_Result = $('*[' + _GUID_ + ']').removeAttr(_GUID_);
+
+            if (arguments[0])  $_Result = $_Result.filter(arguments[0]);
+
+            return  this.pushStack( Array.prototype.reverse.call($_Result) );
+        },
+        sameParents:        function () {
+            var _GUID_ = _Parents_.call(this);
+            var iTimes = $(DOM.documentElement).attr(_GUID_);
+
+            var $_Result = $(['*[', _GUID_, '="', iTimes, '"]'].join(''))
+                    .removeAttr(_GUID_);
+
+            if (arguments[0])  $_Result = $_Result.filter(arguments[0]);
+
+            return  this.pushStack( Array.prototype.reverse.call($_Result) );
+        },
+        parentsUntil:       function () {
+            return  this.parents().not(
+                    $(arguments[0]).parents().addBack()
+                );
+        },
+        children:           function () {
+            var $_Result = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                $_Result = Array_Concat($_Result, this[i].children);
+
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
+
+            return this.pushStack($_Result);
+        },
+        contents:           function () {
+            var $_Result = [ ],
                 Type_Filter = parseInt(arguments[0]);
 
-            for (var i = 0;  i < $_This.length;  i++)
-                $_Result = $_Result.concat($.makeArray(
-                    ($_This[i].tagName.toLowerCase() != 'iframe') ?
-                        $_This[i].childNodes : $_This[i].contentWindow.document
-                ));
+            for (var i = 0;  i < this.length;  i++)
+                $_Result = $_Result.concat(
+                    (this[i].tagName.toLowerCase() != 'iframe') ?
+                        $.makeArray(this[i].childNodes) : this[i].contentWindow.document
+                );
 
             if ($.type(Type_Filter) == 'Number')
                 for (var i = 0;  i < $_Result.length;  i++)
                     if ($_Result[i].nodeType != Type_Filter)
                         $_Result[i] = null;
 
-            return  $.extend($($_Result), {prevObject:  $_This});
+            return this.pushStack($_Result);
         },
-        siblings:       function () {
-            var _UID_ = $.now();
-            var $_This = this.data('iQuery', _UID_);
-
-            var $_Result = this.parent().children();
-            for (var i = 0;  i < $_Result.length;  i++)
-                if (Get_Attribute($_Result[i], 'iQuery') == _UID_)
-                    $_Result[i] = null;
-
-            $_Result = $($_Result);
-            if ( arguments[0] )
-                $_Result = $_Result.filter(arguments[0]);
-
-            return  $.extend($_Result, {prevObject:  $_This});
-        },
-        find:           function () {
-            var $_This = this,  $_Result = [ ];
-
-            for (var i = 0;  i < $_This.length;  i++)
-                $_Result = [ ].concat.apply($_Result, $(arguments[0], $_This[i]));
-
-            return  $.extend($($_Result), {prevObject:  $_This});
-        },
-        text:           function (iText) {
-            var iResult = [ ];
+        nextAll:            function () {
+            var $_Result = [ ];
 
             for (var i = 0;  i < this.length;  i++)
-                if (! iText)
-                    iResult.push( this[i].innerText );
+                $_Result = Array_Concat(
+                    $_Result,  Object_Seek.call(this[i], 'nextElementSibling')
+                );
+
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
+
+            return this.pushStack($_Result);
+        },
+        prevAll:            function () {
+            var $_Result = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                $_Result = Array_Concat(
+                    $_Result,  Object_Seek.call(this[i], 'previousElementSibling')
+                );
+
+            if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
+
+            return this.pushStack($_Result);
+        },
+        siblings:           function () {
+            var $_Result = this.prevAll().add( this.nextAll() );
+
+            if (arguments[0])  $_Result = $_Result.filter(arguments[0]);
+
+            return this.pushStack($_Result);
+        },
+        find:               function () {
+            var $_Result = [ ];
+
+            for (var i = 0;  i < this.length;  i++)
+                $_Result = Array_Concat($_Result,  $(arguments[0], this[i]));
+
+            return this.pushStack($_Result);
+        },
+        detach:             function () {
+            for (var i = 0;  i < this.length;  i++)
+                if (this[i].parentNode)
+                    this[i].parentNode.removeChild(this[i]);
+
+            return this;
+        },
+        remove:             function () {
+            return this.detach().data();
+        },
+        empty:              function () {
+            this.children().remove();
+
+            for (var i = 0, iChild;  i < this.length;  i++) {
+                iChild = this[i].childNodes;
+                for (var j = 0;  j < iChild.length;  j++)
+                    this[i].removeChild(iChild[j]);
+            }
+
+            return this;
+        },
+        text:               function (iText) {
+            var iGetter = (! $.isData(iText)),  iResult = [ ];
+
+            if (! iGetter)  this.empty();
+
+            for (var i = 0;  i < this.length;  i++)
+                if (iGetter)
+                    iResult.push( _DOM_.innerText.get(this[i]) );
                 else
-                    this[i].innerText = iText;
+                    _DOM_.innerText.set(this[i], iText);
 
             return  iResult.length ? iResult.join('') : this;
         },
-        html:           function (iHTML) {
-            if (! iHTML)  return this[0].innerHTML;
+        html:               function (iHTML) {
+            if (! $.isData(iHTML))
+                return this[0].innerHTML;
+
+            this.empty();
 
             for (var i = 0;  i < this.length;  i++)
-                this[i].innerHTML = iHTML;
+                _DOM_.innerHTML.set(this[i], iHTML);
 
             return  this;
         },
-        css:            function (iName, iValue) {
-            var iResult = _Operator_('Style', this, arguments[0], arguments[1]);
-            return  (typeof iResult == 'undefined') ? this : iResult;
+        css:                function () {
+            return  _DOM_.operate('Style', this, arguments[0], arguments[1]);
         },
-        hide:           function () {
+        hide:               function () {
             for (var i = 0, $_This;  i < this.length;  i++) {
                 $_This = $(this[i]);
                 $_This.data('display', $_This.css('display'))
@@ -1291,14 +1336,18 @@ self.onerror = function () {
             }
             return this;
         },
-        show:           function () {
+        show:               function () {
             for (var i = 0, $_This;  i < this.length;  i++) {
                 $_This = $(this[i]);
-                $_This.css('display',  $_This.data('display') || 'origin');
+                $_This.css({
+                    display:       $_This.data('display') || 'origin',
+                    visibility:    'visible',
+                    opacity:       1
+                });
             }
             return this;
         },
-        width:          function () {
+        width:              function () {
             switch ( $.type(this[0]) ) {
                 case 'Document':    return  Math.max(
                         DOM.documentElement.scrollWidth,
@@ -1311,7 +1360,7 @@ self.onerror = function () {
                 default:            return  this.css('width', arguments[0]);
             }
         },
-        height:         function () {
+        height:             function () {
             switch ( $.type(this[0]) ) {
                 case 'Document':    return  Math.max(
                         DOM.documentElement.scrollHeight,
@@ -1324,213 +1373,267 @@ self.onerror = function () {
                 default:            return  this.css('height', arguments[0]);
             }
         },
-        position:       function () {
+        scrollTop:          DOM_Scroll('Top'),
+        scrollLeft:         DOM_Scroll('Left'),
+        position:           function () {
             return  {
                     left:    this[0].offsetLeft,
                     top:     this[0].offsetTop
                 };
         },
-        offset:         function () {
-            var iOffset = {
-                    left:    this[0].offsetLeft,
-                    top:     this[0].offsetTop
-                };
+        offset:             DOM_Offset,
+        addClass:           function (new_Class) {
+            if (typeof new_Class != 'string')  return this;
 
-            Back_Track.call('offsetParent', function () {
-                iOffset.left += this.offsetLeft;
-                iOffset.top += this.offsetTop;
+            new_Class = new_Class.trim().split(/\s+/);
+
+            return  this.attr('class',  function (_Index_, old_Class) {
+                old_Class = (old_Class || '').trim().split(/\s+/);
+
+                for (var i = 0;  i < new_Class.length;  i++)
+                    if ($.inArray(old_Class, new_Class[i]) == -1)
+                        old_Class.push( new_Class[i] );
+
+                return  old_Class.join(' ').trim();
             });
-
-            return iOffset;
         },
-        addClass:       function (new_Class) {
-            new_Class = new_Class.split(' ');
+        removeClass:        function (iClass) {
+            if (typeof iClass != 'string')  return this;
 
-            for (var i = 0, old_Class;  i < this.length;  i++) {
-                old_Class = _Operator_('Attribute', [this[i]], 'class') || [ ];
-                if (typeof old_Class == 'string')
-                    old_Class = old_Class.replace(/\s+/g, ' ').split(' ');
-                for (var j = 0;  j < new_Class.length;  j++)
-                    if ($.inArray(old_Class, new_Class[j]) == -1)
-                        old_Class.push( new_Class[j] );
-                _Operator_('Attribute', [this[i]], 'class', old_Class.join(' '));
-            }
+            iClass = iClass.trim().split(/\s+/);
 
-            return this;
+            return  this.attr('class',  function (_Index_, old_Class) {
+                old_Class = (old_Class || '').trim().split(/\s+/);
+                if (! old_Class[0])  return;
+
+                var new_Class = [ ];
+
+                for (var i = 0;  i < old_Class.length;  i++)
+                    if ($.inArray(iClass, old_Class[i]) == -1)
+                        new_Class.push( old_Class[i] );
+
+                return  new_Class.join(' ');
+            });
         },
-        removeClass:    function (iClass) {
-            iClass = BOM.iRegExp(
-                '\s+(' + iClass.replace(/\s+/g, '|') + ')\s+',  'g'
-            );
+        hasClass:           function (iClass) {
+            if (typeof iClass != 'string')  return false;
 
-            for (var i = 0;  i < this.length;  i++)
-                _Operator_('Attribute', 
-                    [this[i]],  'class',  _Operator_('Attribute', [this[i]], 'class').replace(iClass, ' ')
-                );
+            iClass = iClass.trim();
 
-            return this;
+            if (! DOM.documentElement.classList)
+                return  ((' ' + this.attr('class') + ' ').indexOf(' ' + iClass + ' ') > -1);
+            else
+                return  this[0].classList.contains(iClass);
         },
-        hasClass:       function () {
-            return  ((' ' + this.attr('class') + ' ').indexOf(' ' + arguments[0] + ' ') > -1);
-        },
-        bind:           function (iType, iCallback) {
-            for (var i = 0;  i < this.length;  i++)
-                Event_Switch(this[i], iType, iCallback);
+        bind:               function (iType, iCallback) {
+            iType = iType.trim().split(/\s+/);
 
-            return  this;
-        },
-        unbind:         function (iType) {
-            for (var i = 0;  i < this.length;  i++)
-                Event_Switch(this[i], iType);
+            return  this.each(function () {
+                var $_This = $(this);
 
-            return  this;
+                for (var i = 0;  i < iType.length;  i++)
+                    $_This.data('_event_',  function () {
+                        var Event_Data = arguments[1] || { };
+
+                        if (! Event_Data[iType[i]]) {
+                            Event_Data[iType[i]] = [ ];
+                            this.addEventListener(iType[i], Proxy_Handler);
+                        }
+                        Event_Data[iType[i]].push(iCallback);
+
+                        return Event_Data;
+                    });
+            });
         },
-        on:             function (iType, iFilter, iCallback) {
-            if ($.type(iFilter) != 'String')
+        unbind:             function (iType, iCallback) {
+            iType = iType.trim().split(/\s+/);
+
+            return  this.each(function () {
+                var $_This = $(this);
+
+                for (var i = 0;  i < iType.length;  i++)
+                    $_This.data('_event_',  function () {
+                        var Event_Data = arguments[1] || { };
+                        var This_Event = Event_Data[iType[i]];
+
+                        if (iCallback)
+                            This_Event.splice(This_Event.indexOf(iCallback), 1);
+                        if ((! iCallback) || (! This_Event.length))
+                            Event_Data[iType[i]] = null;
+                        if (! Event_Data[iType[i]])
+                            this.removeEventListener(iType[i], Proxy_Handler);
+
+                        return Event_Data;
+                    });
+            });
+        },
+        on:                 function (iType, iFilter, iCallback) {
+            if (typeof iFilter != 'string')
                 return  this.bind.apply(this, arguments);
             else
                 return  this.bind(iType, function () {
-                        if ( $(arguments[0].target).is(iFilter) )
-                            iCallback.apply(this, arguments);
+                        var iArgs = $.makeArray(arguments);
+
+                        var $_Filter = $(iFilter, this),
+                            $_Target = $(iArgs[0].target),
+                            iReturn;
+
+                        var $_Patch = $_Target.parents();
+                        Array.prototype.unshift.call($_Patch, $_Target[0]);
+
+                        for (var i = 0, _Return_;  i < $_Patch.length;  i++) {
+                            if ($_Patch[i] === this)  break;
+                            if ($.inArray($_Filter, $_Patch[i]) == -1)  continue;
+
+                            if (iArgs[1] === null)
+                                iArgs = [ iArgs[0] ].concat( $($_Patch[i]).data('_trigger_') );
+                            _Return_ = iCallback.apply($_Patch[i], iArgs);
+                            if (iReturn !== false)
+                                iReturn = _Return_;
+                        }
+
+                        return iReturn;
                     });
         },
-        ready:          function (iCallback) {
-            if ($.type(this[0]) != 'Document')
-                throw 'The Ready Method is only used for Document Object !';
+        one:                function () {
+            var iArgs = $.makeArray(arguments);
+            var iCallback = iArgs[iArgs.length - 1];
 
-            if (! DOM.isReady) {
-                var iEvent = this.data('event');
-                iEvent.ready.push(iCallback);
-                this.data('event', iEvent);
-            } else
-                iCallback.call(this[0],  $.data(DOM, 'Ready_Event'));
+            iArgs.splice(-1,  1,  function () {
+                $.fn.unbind.apply($(this), iArgs);
 
-            return this;
+                return  iCallback.apply(this, arguments);
+            });
+
+            return  this.on.apply(this, iArgs);
         },
-        hover:          function (iEnter, iLeave) {
-            return  this.bind('mouseover', function () {
-                    if (
-                        $.contains(this, arguments[0].relatedTarget) ||
-                        ($(arguments[0].target).css('position') in Type_Info.Float)
-                    )
-                        return false;
-                    iEnter.apply(this, arguments);
-                }).bind('mouseout', function () {
-                    if (
-                        $.contains(this, arguments[0].relatedTarget) ||
-                        ($(arguments[0].target).css('position') in Type_Info.Float)
-                    )
-                        return false;
-                    (iLeave || iEnter).apply(this, arguments);
+        trigger:            function (iType, iData) {
+            if (typeof iType != 'string') {
+                var iEvent = iType;
+                iType = iEvent.type;
+            }
+            return Event_Trigger.call(
+                    this,
+                    (iType in Type_Info.DOM_Event) ? 'HTMLEvents' : 'CustomEvent',
+                    iType,
+                    iData
+                );
+        },
+        triggerHandler:     function () {
+            var iHandler = $(this[0]).data('_event_');
+            iHandler = iHandler && iHandler[arguments[0]];
+            if (! iHandler)  return;
+
+            var iArgs = $.makeArray(arguments),  iReturn;
+            iArgs.unshift([ ]);
+            for (var i = 0;  i < iHandler.length;  i++)
+                iReturn = iHandler[i].apply(
+                    this[0],  Array_Concat.apply(BOM, iArgs)
+                );
+
+            return iReturn;
+        },
+        clone:              function (iDeep) {
+            var $_Result = [ ];
+
+            for (var i = 0, iEvent;  i < this.length;  i++) {
+                $_Result[i] = this[i].cloneNode(iDeep);
+                iEvent = _DOM_.Data.clone(this[i], $_Result[i]);
+
+                for (var iType in iEvent)
+                    $_Result[i].addEventListener(iType, Proxy_Handler, false);
+            }
+
+            return this.pushStack($_Result);
+        },
+        append:             function () {
+            var $_Child = $(arguments[0], arguments[1]),
+                DOM_Cache = DOM.createDocumentFragment();
+
+            return  this.each(function (Index) {
+                    var _Child_ = Index ? $_Child.clone(true) : $_Child,
+                        _Cache_ = DOM_Cache.cloneNode();
+
+                    for (var i = 0;  i < _Child_.length;  i++)
+                        _Cache_.appendChild( _Child_[i] );
+
+                    this.appendChild(_Cache_);
                 });
         },
-        trigger:        function () {
-            for (var i = 0;  i < this.length;  i++)
-                _Event_.trig(this[i], arguments[0]);
-
-            return this;
-        },
-        append:         function () {
-            var $_Child = $(arguments[0], arguments[1]);
-
-            for (var i = 0;  i < $_Child.length;  i++)
-                this[0].appendChild( $_Child[i] );
-
-            return this;
-        },
-        appendTo:       function () {
-            $_Target = $(arguments[0], arguments[1]);
-
-            for (var i = 0;  i < this.length;  i++)
-                $_Target[0].appendChild( this[i] );
+        appendTo:           function () {
+            $(arguments[0], arguments[1]).append(this);
 
             return  this;
         },
-        before:         function () {
-            var $_Brother = $(arguments[0], arguments[1]);
+        before:             function () {
+            var $_Brother = $(arguments[0], arguments[1]),
+                DOM_Cache = DOM.createDocumentFragment();
 
-            for (var i = 0;  i < $_Brother.length;  i++)
-                this[0].parentNode.insertBefore($_Brother[i], this[0]);
+            return  this.each(function (Index) {
+                    var _Brother_ = Index ? $_Brother.clone(true) : $_Brother,
+                        _Cache_ = DOM_Cache.cloneNode();
 
-            return this;
+                    for (var i = 0;  i < _Brother_.length;  i++)
+                        _Cache_.appendChild( _Brother_[i] );
+
+                    this.parentNode.insertBefore(_Cache_, this);
+                });
         },
-        clone:          function (iDeep) {
-            var $_This = this,  $_Result = [ ];
-
-            for (var i = 0;  i < $_This.length;  i++) {
-                $_Result[i] = $_This[i].cloneNode(iDeep);
-                _Get_Set_.Data.clone($_This[i], $_Result[i]);
+        prepend:            function () {
+            if (this.length) {
+                if (! this[0].children.length)
+                    this.append.apply(this, arguments);
+                else
+                    this.before.apply($(this[0].children[0]), arguments);
             }
-
-            return  $.extend($($_Result), {prevObject:  $_This});
-        },
-        remove:         function () {
-            for (var i = 0;  i < this.length;  i++)
-                this[i].parentNode.removeChild(this[i]);
-
-            _Operator_('Data', this);
-
             return this;
         },
-        empty:          function () {
-            var iChild = this.children().remove();
+        prependTo:          function () {
+            $(arguments[0], arguments[1]).prepend(this);
 
-            for (var i = 0;  i < iChild.length;  i++)
-                iChild[i].innerHTML = '';
-
-            return this;
+            return  this;
         },
-        addBack:        function () {
-            var $_This = this,
-                _UID_ = $.now();
-
-            var $_Result = $(
-                    $.makeArray($_This).concat(
-                        $.makeArray($_This.prevObject)
-                    )
-                ).data('iQuery', _UID_);
-
-            return  $.extend(
-                    $('*[iQuery="' + _UID_ + '"]'),
-                    {prevObject:  $_This}
-                );
-        },
-        val:            function () {
-            if (! arguments[0])
-                return  this[0].value;
+        val:                function () {
+            if (! $.isData(arguments[0]))
+                return  this[0] && this[0].value;
             else
-                return  this.attr('value', arguments[0]);
+                return  this.not('input[type="file"]').prop('value', arguments[0]);
         },
-        serializeArray:    function () {
-            var $_Value = this.find('*[name]'),
+        serializeArray:     function () {
+            var $_Value = this.find('*[name]:input').not(':button, [disabled]'),
                 iValue = [ ];
 
-            for (var i = 0;  i < $_Value.length;  i++)
-                if (
-                    (! $_Value[i].disabled) ||
-                    (! ($_Value[i].type in Type_Info.DOM.button))
-                )
-                    iValue.push({
-                        name:     $_Value[i].name,
-                        value:    $_Value[i].value
-                    });
+            for (var i = 0;  i < $_Value.length;  i++) {
+                if ($_Value[i].type.match(/radio|checkbox/i)  &&  (! $_Value[i].checked))
+                    continue;
+
+                iValue.push({
+                    name:     $_Value[i].name,
+                    value:    $_Value[i].value
+                });
+            }
 
             return iValue;
+        },
+        serialize:          function () {
+            return  $.param( this.serializeArray() );
         }
     });
 
-    /* ----- Event ShortCut ----- */
+/* ---------- Event ShortCut ---------- */
     $.fn.off = $.fn.unbind;
 
-    var no_ShortCut = {
-            load:                true,
-            DOMContentLoaded:    true,
-            mouseover:           true,
-            mouseout:            true,
-            mouseenter:          true,
-            mouseleave:          true,
-            mousewheel:          true
-        };
+    var iShortCut = $.extend(_inKey_('tap', 'press', 'swipe'),  Type_Info.DOM_Event),
+        no_ShortCut = _inKey_(
+            'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'mousewheel',
+            'load', 'DOMContentLoaded',
+            'DOMAttrModified', 'DOMAttributeNameChanged',
+            'DOMCharacterDataModified',
+            'DOMElementNameChanged',
+            'DOMNodeInserted', 'DOMNodeInsertedIntoDocument',
+            'DOMNodeRemoved',  'DOMNodeRemovedFromDocument',
+            'DOMSubtreeModified'
+        );
 
     function Event_Method(iName) {
         return  function () {
@@ -1538,7 +1641,7 @@ self.onerror = function () {
                     for (var i = 0;  i < this.length;  i++)  try {
                         this[i][iName]();
                     } catch (iError) {
-                        _Event_.trig(this[i], iName);
+                        $(this[i]).trigger(iName);
                     }
                 } else
                     this.bind(iName, arguments[0]);
@@ -1547,140 +1650,108 @@ self.onerror = function () {
             };
     }
 
-    for (var i = 0, iName;  i < Type_Info.DOM_Event.length;  i++) {
-        iName = Type_Info.DOM_Event[i];
+    for (var iName in iShortCut)
         if (! (iName in no_ShortCut))
             $.fn[iName] = Event_Method(iName);
+
+    if ($.browser.mobile)  $.fn.click = $.fn.tap;
+
+
+
+    $(BOM).data('_type_', Type_Info);    //  Share Information of Types between iQuery Modules.
+
+
+
+/* ----- DOM UI Data Operator ----- */
+    function Value_Operator(iValue, iResource) {
+        var $_This = $(this),  iReturn;
+
+        switch ( this.tagName.toLowerCase() ) {
+            case 'img':      {
+                iReturn = $_This.one('load',  function () {
+                    $(this).trigger('ready');
+                }).addClass('jQuery_Loading').attr('src', iValue);
+                iResource.count++ ;
+                console.log(this);
+            }  break;
+            case 'textarea':    ;
+            case 'select':      ;
+            case 'input':       {
+                if (($_This.attr('type') || '').match(/radio|checkbox/i)  &&  iValue)
+                    $_This.prop('checked', true);
+                iReturn = $_This.val(iValue);
+                break;
+            }
+            default:         {
+                var _Set_ = iValue || $.isData(iValue),
+                    End_Element = (! this.children.length),
+                    _BGI_ = (typeof iValue == 'string') && iValue.match(/^\w+:\/\/[^\/]+/);
+
+                if (_Set_) {
+                    if ((! End_Element) && _BGI_)
+                        $_This.css('background-image',  'url("' + iValue + '")');
+                    else
+                        $_This.html(iValue);
+                } else {
+                    _BGI_ = $_This.css('background-image').match(/^url\(('|")?([^'"]+)('|")?\)/);
+                    _BGI_ = _BGI_ && _BGI_[2];
+                    iReturn = End_Element ? $_This.text() : _BGI_;
+                    iReturn = $.isData(iReturn) ? iReturn : _BGI_;
+                }
+            }
+        }
+        return iReturn;
     }
 
+    $.fn.value = function (iFiller) {
+        var $_Name = this.filter('*[name]');
+        if (! $_Name.length)
+            $_Name = this.find('*[name]');
 
-/* ---------- jQuery+ v1.2 ---------- */
+        if (! iFiller)
+            return Value_Operator.call($_Name[0]);
+        else if ( $.isPlainObject(iFiller) )
+            var Data_Set = true;
 
-    /* ----- CSS 规则添加  v0.5 ----- */
+        var Resource_Ready = {count:  0},  $_This = this;
 
-    function CSS_Rule2Text(iRule) {
-        var Rule_Text = [''],  Rule_Block,  _Rule_Block_;
+        this.on('ready',  'img.jQuery_Loading',  function () {
+            $(this).removeClass('jQuery_Loading');
+            if (--Resource_Ready.count == 0)
+                $_This.trigger('ready');
+            console.log(Resource_Ready.count, this);
+            return false;
+        });
 
-        for (var iSelector in iRule) {
-            Rule_Block = iSelector + ' {';
-            _Rule_Block_ = [ ];
+        for (var i = 0, iName;  i < $_Name.length;  i++) {
+            iName = $_Name[i].getAttribute('name');
 
-            for (var iAttribute in iRule[iSelector])
-                _Rule_Block_.push(
-                    _Operator_('Style', [null], iAttribute, iRule[iSelector][iAttribute])
-                        .replace(/^(\w)/m,  Code_Indent + '$1')
-                );
-
-            Rule_Text.push(
-                [Rule_Block, _Rule_Block_.join(";\n"), '}'].join("\n")
+            Value_Operator.call(
+                $_Name[i],
+                Data_Set  ?  iFiller[iName]  :  iFiller.call($_Name[i], iName),
+                Resource_Ready
             );
         }
-        Rule_Text.push('');
-
-        return Rule_Text.join("\n");
-    }
-
-    $.cssRule = function () {
-        var iRule = arguments[arguments.length - 1],
-            iMedia = (typeof arguments[0] == 'string') && arguments[0];
-
-        var CSS_Text = CSS_Rule2Text(iRule);
-        if (iMedia)  CSS_Text = [
-                '@media ' + iMedia + ' {',
-                CSS_Text.replace(/\n/m, "\n    "),
-                '}'
-            ].join("\n");
-
-        this(DOM).ready(function () {
-            var $_Style = $('<style />', {
-                    type:       'text/css',
-                    'class':    'jQuery_CSS-Rule'
-                });
-            if (IE_CSS_Filter)
-                $_Style[0].styleSheet.cssText = CSS_Text;
-            else  $_Style.html(CSS_Text);
-
-            $_Style.appendTo('body');
-        });
+        return this;
     };
 
-    /* ----- jQuery 选择符合法性判断  v0.1 ----- */
 
-    $.is_Selector = function (iString) {
-        if (! iString)  return false;
+/* ---------- Smart zIndex ---------- */
+    function Get_zIndex() {
+        var $_This = $(this);
 
-        iString = $.trim(
-            iString.replace(/([^\.])(\.|#|\[|:){1,2}[^\.#\[:\s>\+~]+/, '$1')
-        );
-        if (! iString)  return true;
+        var _zIndex_ = $_This.css('z-index');
+        if (_zIndex_ != 'auto')  return parseInt(_zIndex_);
 
-        if ($('<' + iString + ' />')[0] instanceof HTMLUnknownElement)
-            return false;
-        return true;
-    };
-
-    /* ----- jQuery 对象 所在页面 URL 路径  v0.1 ----- */
-
-    $.fn.PagePath = function () {
-        var _PP = this[0].baseURI ? this[0].baseURI : document.URL;
-        _PP = _PP.split('/');
-        if (_PP.length > 3) _PP.pop();
-        _PP.push('');
-        return _PP.join('/');
-    };
-
-    /* ----- jQuery 元素集合父元素交集  v0.1 ----- */
-
-    $.fn.sameParents = function () {
-        if (! this.length)
-            throw 'No Element in the jQuery DOM Set...';
-        if (this.length == 1) {
-            console.warn("The jQuery DOM Set has only one Element:\n\n%o", this);
-
-            return this.parents();
-        }
-        var $_Min = this.eq(0).parents(),
-            $_Larger, $_Root;
-
-        this.each(function () {
-            if (! arguments[0]) return;
-
-            var $_Parents = $(this).parents();
-
-            if ($_Parents.length > $_Min.length)
-                $_Larger = $_Parents;
-            else {
-                $_Larger = $_Min;
-                $_Min = $_Parents;
-            }
-        });
-
-        $_Min.each(function (Index) {
-            Index -= $_Min.length;
-
-            if (this === $_Larger[$_Larger.length + Index]) {
-                $_Root = $_Min.slice(Index);
-                return false;
-            }
-        });
-
-        return  arguments[0] ? $_Root.filter(arguments[0]) : $_Root;
-    };
-
-    /* ----- jQuery 元素 z-index 独立方法  v0.2 ----- */
-
-    function Get_zIndex($_DOM) {
-        var _zIndex_ = $_DOM.css('z-index');
-        if (_zIndex_ != 'auto')  return Number(_zIndex_);
-
-        var $_Parents = $_DOM.parents();
+        var $_Parents = $_This.parents();
         _zIndex_ = 0;
 
         $_Parents.each(function () {
             var _Index_ = $(this).css('z-index');
 
-            if (_Index_ == 'auto')  _zIndex_++ ;
-            else  _zIndex_ += _Index_;
+            _zIndex_ = _zIndex_ + (
+                (_Index_ == 'auto')  ?  1  :  _Index_
+            );
         });
 
         return ++_zIndex_;
@@ -1689,69 +1760,670 @@ self.onerror = function () {
     function Set_zIndex() {
         var $_This = $(this),  _Index_ = 0;
 
-        $_This.siblings().addBack().each(function () {
-            _Index_ = Math.max(_Index_, Get_zIndex( $(this) ));
+        $_This.siblings().addBack().filter(':visible').each(function () {
+            _Index_ = Math.max(_Index_, Get_zIndex.call(this));
         });
-        $_This.css('z-index', _Index_);
+        $_This.css('z-index', ++_Index_);
     }
 
     $.fn.zIndex = function (new_Index) {
-        if (! new_Index)
-            return  Get_zIndex(this.eq(0));
+        if (! $.isData(new_Index))
+            return  Get_zIndex.call(this[0]);
         else if (new_Index == '+')
             return  this.each(Set_zIndex);
         else
-            return  this.css('z-index',  Number(new_Index) || 'auto');
+            return  this.css('z-index',  parseInt(new_Index) || 'auto');
     };
 
-    /* ----- Form 元素 无刷新提交（iframe 版） v0.2 ----- */
 
-    $.fn.post = function () {
-        var iArgs = $.makeArray(arguments);
-        var $_Form = this.is('form') ? this : this.find('form').eq(0),
-            iAttribute = $.isPlainObject(iArgs[0]) ? iArgs.shift() : { },
-            iCallback = ($.type(iArgs[0]) == 'Function') ? iArgs.shift() : null;
+/* ---------- CSS Rule ---------- */
+    function CSS_Rule2Text(iRule) {
+        var Rule_Text = [''],  Rule_Block,  _Rule_Block_;
 
-        var iTarget = $_Form.attr('target'),
-            $_iFrame = [ ];
-        if (! iTarget) {
-            iTarget = 'iFrame_' + $.now();
-            $_Form.attr('target', iTarget);
-        } else
-            $_iFrame = $('iframe[name="' + iTarget + '"]');
-        iAttribute = $.extend({
-            frameBorder:          0,
-            allowTransparency:    true
-        }, iAttribute);
-        if (! $_iFrame.length)
-            $_iFrame = $('<iframe />', $.extend(iAttribute, {name:  iTarget}));
-        else {
-            var iAttr = { };
-            $.each(iAttribute, function (iKey, iValue) {
-                if (iKey in $.fn)
-                    $_iFrame[iKey](iValue);
-                else
-                    iAttr[iKey] = iValue;
-            });
-            $_iFrame.attr(iAttr);
-        }
-        $_iFrame.appendTo( $_Form.parent() ).on('load', function () {
-            try {
-                var $_Content = $(this).contents();
-                iCallback.call(
-                    $_Form[0],  $_Content.find('body').text(),  $_Content
+        $.each(iRule,  function (iSelector) {
+            Rule_Block = iSelector + ' {';
+            _Rule_Block_ = [ ];
+
+            for (var iAttribute in this)
+                _Rule_Block_.push(
+                    _DOM_.operate('Style', [null], iAttribute, this[iAttribute])
+                        .replace(/^(\w)/m,  Code_Indent + '$1')
                 );
-            } catch (iError) { }
-        });
-        $_Form[0].submit();
 
-        return $_iFrame;
+            Rule_Text.push(
+                [Rule_Block, _Rule_Block_.join(";\n"), '}'].join("\n")
+            );
+        });
+        Rule_Text.push('');
+
+        return Rule_Text.join("\n");
+    }
+
+    $.cssRule = function (iMedia, iRule) {
+        if (typeof iMedia != 'string') {
+            iRule = iMedia;
+            iMedia = null;
+        }
+
+        var CSS_Text = CSS_Rule2Text(iRule);
+        if (iMedia)  CSS_Text = [
+                '@media ' + iMedia + ' {',
+                CSS_Text.replace(/\n/m, "\n    "),
+                '}'
+            ].join("\n");
+
+        var $_Style = $('<style />', {
+                type:       'text/css',
+                'class':    'jQuery_CSS-Rule'
+            });
+
+        if ($.browser.modern)
+            $_Style.html(CSS_Text);
+        else
+            $_Style[0].styleSheet.cssText = CSS_Text;
+
+        $_Style.appendTo(DOM.head);
+
+        return $_Style[0].sheet;
+    };
+
+    $.fn.cssRule = function (iRule, iCallback) {
+        return  this.each(function () {
+            var $_This = $(this);
+            var _GUID_ = $_This.data('css') || $.guid();
+
+            $(this).attr('data-css', _GUID_);
+            for (var iSelector in iRule) {
+                iRule['*[data-css="' + _GUID_ + '"]' + iSelector] = iRule[iSelector];
+                delete iRule[iSelector];
+            }
+
+            var iSheet = $.cssRule(iRule);
+
+            if (iCallback)
+                iCallback.call(this, iSheet);
+        });
+    };
+
+    var Pseudo_RE = /:{1,2}[\w\-]+/g;
+
+    $.cssPseudo = function () {
+        var Pseudo_Rule = [ ];
+
+        $.each(arguments[0] || DOM.styleSheets,  function () {
+            var iRule = this.cssRules;
+            if (! iRule)  return;
+
+            for (var i = 0, iPseudo;  i < iRule.length;  i++)
+                if (! iRule[i].cssRules) {
+                    iPseudo = iRule[i].cssText.match(Pseudo_RE);
+                    if (! iPseudo)  continue;
+
+                    for (var j = 0;  j < iPseudo.length;  j++)
+                        iPseudo[j] = iPseudo[j].split(':').slice(-1)[0];
+                    iRule[i].pseudo = iPseudo;
+                    iRule[i].selectorText = iRule[i].selectorText ||
+                        iRule[i].cssText.match(/^(.+?)\s*\{/)[1];
+                    Pseudo_Rule.push(iRule[i]);
+                } else
+                    arguments.callee.call(iRule[i], i, iRule[i]);
+        });
+
+        return Pseudo_Rule;
     };
 
 })(self, self.document);
 
 
-/* ----- DOM/CSS 动画 ----- */
+
+/* ---------- IE 8- Patch to W3C ---------- */
+(function (BOM, DOM, $) {
+
+    if ($.browser.modern)  return;
+
+    /* ----- DOM Attribute Name ----- */
+    var iAlias = {
+            'class':    'className',
+            'for':      'htmlFor'
+        },
+        Get_Attribute = Element.prototype.getAttribute,
+        Set_Attribute = Element.prototype.setAttribute,
+        Remove_Attribute = Element.prototype.removeAttribute;
+
+    $.extend(Element.prototype, {
+        getAttribute:    function (iName) {
+            return  Get_Attribute.call(this,  iAlias[iName] || iName,  0);
+        },
+        setAttribute:    function (iName) {
+            return  Set_Attribute.call(this,  iAlias[iName] || iName,  arguments[1],  0);
+        },
+        removeAttribute:    function (iName) {
+            return  Remove_Attribute.call(this,  iAlias[iName] || iName,  0);
+        }
+    });
+
+    /* ----- DOM Sibling ----- */
+    Object.defineProperty(Element.prototype, 'previousElementSibling', {
+        get:    function () {
+            return this.previousSibling;
+        },
+        set:    function () { }
+    });
+
+    Object.defineProperty(Element.prototype, 'nextElementSibling', {
+        get:    function () {
+            return this.nextSibling;
+        },
+        set:    function () { }
+    });
+
+
+    /* ----- Computed Style ----- */
+    function CSSStyleDeclaration() {
+        $.extend(this, arguments[0].currentStyle, {
+            length:       0,
+            cssText:      '',
+            ownerNode:    arguments[0]
+        });
+
+        for (var iName in this) {
+            this[this.length++] = iName.toHyphenCase();
+            this.cssText += [
+                iName,  ': ',  this[iName],  '; '
+            ].join('');
+        }
+        this.cssText = this.cssText.trim();
+    }
+
+    var Code_Indent = ' '.repeat(4);
+
+    function toHexInt(iDec, iLength) {
+        var iHex = parseInt( Number(iDec).toFixed(0) ).toString(16);
+
+        if (iLength && (iLength > iHex.length))
+            iHex = '0'.repeat(iLength - iHex.length) + iHex;
+
+        return iHex;
+    }
+
+    function RGB_Hex(iRed, iGreen, iBlue) {
+        var iArgs = $.makeArray(arguments);
+
+        if ((iArgs.length == 1) && (typeof iArgs[0] == 'string'))
+            iArgs = iArgs[0].replace(/rgb\(([^\)]+)\)/i, '$1').replace(/,\s*/g, ',').split(',');
+
+        for (var i = 0;  i < 3;  i++)
+            iArgs[i] = toHexInt(iArgs[i], 2);
+        return iArgs.join('');
+    }
+
+    $.extend(CSSStyleDeclaration.prototype, {
+        getPropertyValue:    function (iName) {
+            var iScale = 1;
+
+            switch (iName) {
+                case 'opacity':    {
+                    iName = 'filter';
+                    iScale = 100;
+                }
+            }
+            var iStyle = this[ iName.toCamelCase() ];
+            var iNumber = parseFloat(iStyle);
+
+            return  isNaN(iNumber) ? iStyle : (iNumber / iScale);
+        },
+        setPropertyValue:    function (iName, iValue) {
+            this[this.length++] = iName;
+
+            var iString = '',  iWrapper,  iScale = 1,  iConvert;
+            if (typeof iValue == 'string')
+                var iRGBA = iValue.match(/\s*rgba\(([^\)]+),\s*(\d\.\d+)\)/i);
+
+            if (iName == 'opacity') {
+                iName = 'filter';
+                iWrapper = 'progid:DXImageTransform.Microsoft.Alpha(opacity={n})';
+                iScale = 100;
+            } else if (iRGBA) {
+                iString = iValue.replace(iRGBA[0], '');
+                if (iString)
+                    iString += arguments.callee.call(this, arguments[0], iName, iString);
+                if (iName != 'background')
+                    iString += arguments.callee.call(
+                        this,
+                        arguments[0],
+                        (iName.indexOf('-color') > -1) ? iName : (iName + '-color'),
+                        'rgb(' + iRGBA[1] + ')'
+                    );
+                iName = 'filter';
+                iWrapper = 'progid:DXImageTransform.Microsoft.Gradient(startColorStr=#{n},endColorStr=#{n})';
+                iConvert = function (iAlpha, iRGB) {
+                    return  toHexInt(parseFloat(iAlpha) * 256, 2) + RGB_Hex(iRGB);
+                };
+            }
+            if (iWrapper)
+                iValue = iWrapper.replace(/\{n\}/g,  iConvert ?
+                      iConvert(iRGBA[2], iRGBA[1]) :
+                      (iValue * iScale)
+                );
+
+            this[ this[this.length - 1].toCamelCase() ] = iValue + (arguments[2] ? ' !important' : '');
+
+            if (this.ownerNode)
+                this.ownerNode.style.setAttribute(iName,  iValue,  arguments[2] && 'important');
+            else
+                return  [iString, ";\n", iName, ':', Code_Indent, iValue].join('');
+        }
+    });
+
+    BOM.getComputedStyle = function () {
+        return  new CSSStyleDeclaration(arguments[0]);
+    };
+
+
+    /* ----- Event Object ----- */
+    BOM.HTMLEvents = function (iEvent) {
+        $.extend(this, DOM.createEventObject());
+
+        if (! iEvent)  return;
+        
+        $.extend(this, {
+            type:               iEvent.type,
+            target:             iEvent.srcElement,
+            which:              (iEvent.type && (iEvent.type.slice(0, 3) == 'key'))  ?
+                iEvent.keyCode  :  [0, 1, 3, 0, 2, 0, 0, 0][iEvent.button],
+            relatedTarget:      ({
+                mouseover:     iEvent.fromElement,
+                mouseout:      iEvent.toElement,
+                mouseenter:    iEvent.fromElement || iEvent.toElement,
+                mouseleave:    iEvent.toElement || iEvent.fromElement
+            })[iEvent.type],
+            bubbles:            true,
+            eventPhase:         3,
+            view:               BOM,
+            isTrusted:          false,
+            propertyName:       iEvent.propertyName
+        });
+    };
+
+    $.extend(BOM.HTMLEvents.prototype, {
+        initEvent:          function () {
+            $.extend(this, {
+                type:          arguments[0],
+                bubbles:       !! arguments[1],
+                cancelable:    !! arguments[2]
+            });
+        },
+        preventDefault:     function () {
+            BOM.event.returnValue = false;
+            this.defaultPrevented = true;
+        },
+        stopPropagation:    function () {
+            BOM.event.cancelBubble = true;
+        }
+    });
+
+    BOM.CustomEvent = function () {
+        BOM.HTMLEvents.call(this, arguments[0]);
+    };
+    BOM.CustomEvent.prototype = new BOM.HTMLEvents();
+    BOM.CustomEvent.prototype.initCustomEvent = function () {
+        $.extend(this, {
+            type:          arguments[0],
+            bubbles:       !! arguments[1],
+            cancelable:    !! arguments[2],
+            detail:        arguments[3] || 0
+        });
+    };
+
+    DOM.createEvent = function () {
+        return  new BOM[arguments[0]]();
+    };
+
+    function IE_Event_Type(iType) {
+        if (
+            ((BOM !== BOM.top)  &&  (iType == 'DOMContentLoaded'))  ||
+            ((iType == 'load')  &&  ($.type(this) != 'Window'))
+        )
+            return 'onreadystatechange';
+
+        iType = 'on' + iType;
+
+        if (! (iType in this.constructor.prototype))
+            return 'onpropertychange';
+
+        return iType;
+    }
+
+    function IE_Event_DOM() {
+        return  $(
+            ((arguments[0] == 'onpropertychange')  &&  ($.type(this) == 'Document'))  ?
+                this.documentElement  :  this
+        );
+    }
+
+    function IE_Event_Handler(iElement, iCallback) {
+        return  function () {
+                var iEvent = new HTMLEvents(BOM.event),  Loaded;
+                iEvent.currentTarget = iElement;
+
+                switch (iEvent.type) {
+                    case 'readystatechange':    iEvent.type = 'load';
+//                      Loaded = iElement.readyState.match(/loaded|complete/);  break;
+                    case 'load':
+                        Loaded = (iElement.readyState == 'loaded');  break;
+                    case 'propertychange':      {
+                        var iType = iEvent.propertyName.match(/^on(.+)/i);
+                        if (iType  &&  (IE_Event_Type(iType[1]) == 'onpropertychange'))
+                            iEvent.type = iType[1];
+                        else {
+                            iEvent.type = 'DOMAttrModified';
+                            iEvent.attrName = iEvent.propertyName;
+                        }
+                    }
+                    default:                    Loaded = true;
+                }
+                if (Loaded  &&  (typeof iCallback == 'function'))
+                    iCallback.call(iElement, iEvent);
+            };
+    }
+
+    var IE_Event_Method = {
+            addEventListener:       function (iType, iCallback) {
+                iType = IE_Event_Type.call(this, iType);
+                var $_This = IE_Event_DOM.call(this, iType);
+
+                var _Handler_ = IE_Event_Handler(this, iCallback);
+
+                $_This.data('ie-handler',  function () {
+                    var iHandler = arguments[1] || {
+                            user:     [ ],
+                            proxy:    [ ]
+                        };
+                    iHandler.user.push(iCallback);
+                    iHandler.proxy.push(_Handler_);
+                    this.attachEvent(iType, _Handler_);
+
+                    return iHandler;
+                });
+            },
+            removeEventListener:    function (iType, iCallback) {
+                iType = IE_Event_Type.call(this, iType);
+
+                IE_Event_DOM.call(this, iType).data('ie-handler',  function () {
+                    var iHandler = arguments[1];
+                    var _Index_ = iHandler.user.indexOf(iCallback);
+
+                    iHandler.user[_Index_] = null;
+                    this.detachEvent(iType,  iHandler.proxy.splice(_Index_, 1, null)[0]);
+
+                    return iHandler;
+                });
+            },
+            dispatchEvent:          function (iEvent) {
+                var _Type_ = IE_Event_Type.call(this, iEvent.type);
+                var $_This = IE_Event_DOM.call(this, _Type_);
+
+                var iOffset = $_This.offset();
+                $.extend(iEvent, {
+                    clientX:    iOffset.left,
+                    clientY:    iOffset.top
+                });
+
+                if (_Type_ != 'onpropertychange')
+                    this.fireEvent(_Type_, iEvent);
+                else
+                    $_This[0]['on' + iEvent.type] = $.now();
+            }
+        };
+
+    $.extend(Element.prototype, IE_Event_Method);
+    $.extend(DOM, IE_Event_Method);
+    $.extend(BOM, IE_Event_Method);
+
+    //  DOM Content Loading
+    if (BOM === BOM.top)
+        $.every(0.01, function () {
+            try {
+                DOM.documentElement.doScroll('left');
+                $(DOM).trigger('DOMContentLoaded');
+                return false;
+            } catch (iError) {
+                return;
+            }
+        });
+
+    //  Patch for Change Event
+    $(DOM.body).on('click',  'input[type="radio"], input[type="checkbox"]',  function () {
+        this.blur();
+        this.focus();
+    });
+
+
+    /* ----- XML DOM Parser ----- */
+    var IE_DOMParser = (function (MS_Version) {
+            for (var i = 0; i < MS_Version.length; i++)  try {
+                new ActiveXObject( MS_Version[i] );
+                return MS_Version[i];
+            } catch (iError) { }
+        })([
+            'MSXML2.DOMDocument.6.0',
+            'MSXML2.DOMDocument.5.0',
+            'MSXML2.DOMDocument.4.0',
+            'MSXML2.DOMDocument.3.0',
+            'MSXML2.DOMDocument',
+            'Microsoft.XMLDOM'
+        ]);
+
+    function XML_Create() {
+        var iXML = new ActiveXObject(IE_DOMParser);
+        iXML.async = false;
+        iXML.loadXML(arguments[0]);
+        return iXML;
+    }
+
+    BOM.DOMParser = function () { };
+
+    BOM.DOMParser.prototype.parseFromString = function () {
+        var iXML = XML_Create(arguments[0]);
+
+        if (iXML.parseError.errorCode)
+            iXML = XML_Create([
+                '<xml><parsererror><h3>This page contains the following errors:</h3><div>',
+                iXML.parseError.reason,
+                '</div></parsererror></xml>'
+            ].join(''));
+
+        return iXML;
+    };
+
+})(self, self.document, self.iQuery);
+
+
+
+/* ---------- W3C HTML 5  Shim ---------- */
+(function (BOM, DOM, $) {
+
+    if (! ($.browser.msie < 10))  return;
+
+    /* ----- Element Data Set ----- */
+    function DOMStringMap(iElement) {
+        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
+            iAttr = iElement.attributes[i];
+            if (iAttr.nodeName.slice(0, 5) == 'data-')
+                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
+        }
+    }
+
+    Object.defineProperty(Element.prototype, 'dataset', {
+        get:    function () {
+            return  new DOMStringMap(this);
+        },
+        set:    function () { }
+    });
+
+
+    /* ----- History API ----- */
+    var _State_ = [
+            [null, DOM.title, DOM.URL]
+        ],
+        _Pushing_ = false,
+        $_BOM = $(BOM);
+
+    BOM.history.pushState = function (iState, iTitle, iURL) {
+        for (var iKey in iState)
+            if (! $.isData(iState[iKey]))
+                throw ReferenceError("The History State can't be Complex Object !");
+
+        if (typeof iTitle != 'string')
+            throw TypeError("The History State needs a Title String !");
+
+        DOM.title = iTitle;
+        _Pushing_ = true;
+        BOM.location.hash = '_' + (_State_.push(arguments) - 1);
+    };
+
+    BOM.history.replaceState = function () {
+        _State_ = [ ];
+        this.pushState.apply(this, arguments);
+    };
+
+    $_BOM.on('hashchange',  function () {
+        if (_Pushing_) {
+            _Pushing_ = false;
+            return;
+        }
+
+        var iState = _State_[ BOM.location.hash.slice(2) ];
+        if (! iState)  return;
+
+        BOM.history.state = iState[0];
+        DOM.title = iState[1];
+
+        $_BOM.trigger('popstate');
+    });
+
+})(self, self.document, self.iQuery);
+
+
+
+/* ---------- Complex Events ---------- */
+(function (BOM, DOM, $) {
+
+    /* ----- DOM Ready ----- */
+    var $_DOM = $(DOM);
+    $.start('DOM_Ready');
+
+    function DOM_Ready_Event() {
+        if (DOM.isReady) return;
+
+        var _DOM_Ready_ = (DOM.readyState == 'complete') &&
+                DOM.body  &&  DOM.body.lastChild  &&  DOM.getElementById;
+
+        if ((this !== DOM) && (! _DOM_Ready_))
+            return;
+
+        DOM.isReady = true;
+        BOM.clearTimeout( $_DOM.data('Ready_Timer') );
+        $_DOM.data('Load_During', $.end('DOM_Ready'))
+            .data('Ready_Event', arguments[0]);
+        console.info('[DOM Ready Event]');
+        console.log(this, arguments);
+
+        $_DOM.trigger('ready');
+
+        return false;
+    }
+
+    $_DOM.data('Ready_Timer',  $.every(0.5, DOM_Ready_Event));
+    $_DOM.one('DOMContentLoaded', DOM_Ready_Event);
+    $(BOM).one('load', DOM_Ready_Event);
+
+    $.fn.ready = function (iCallback) {
+        if ($.type(this[0]) != 'Document')
+            throw 'The Ready Method is only used for Document Object !';
+
+        if (! DOM.isReady)
+            $_DOM.one('ready', iCallback);
+        else
+            iCallback.call(this[0],  $.data(DOM, 'Ready_Event'));
+
+        return this;
+    };
+
+    /* ----- Mouse Hover ----- */
+    var _Float_ = {
+            absolute:    true,
+            fixed:       true
+        };
+
+    $.fn.hover = function (iEnter, iLeave) {
+        return  this.bind('mouseover', function () {
+                if (
+                    $.contains(this, arguments[0].relatedTarget) ||
+                    ($(arguments[0].target).css('position') in _Float_)
+                )
+                    return false;
+                iEnter.apply(this, arguments);
+            }).bind('mouseout', function () {
+                if (
+                    $.contains(this, arguments[0].relatedTarget) ||
+                    ($(arguments[0].target).css('position') in _Float_)
+                )
+                    return false;
+                (iLeave || iEnter).apply(this, arguments);
+            });
+    };
+
+    /* ----- Single Finger Touch ----- */
+    function get_Touch(iEvent) {
+        if (! iEvent.timeStamp)
+            iEvent.timeStamp = $.now();
+
+        if (! $.browser.mobile)  return iEvent;
+
+        try {
+            return iEvent.changedTouches[0];
+        } catch (iError) {
+            return iEvent.touches[0];
+        }
+    }
+
+    var Touch_Data;
+
+    $_DOM.bind(
+        $.browser.mobile ? 'touchstart MSPointerDown' : 'mousedown',
+        function (iEvent) {
+            var iTouch = get_Touch(iEvent);
+
+            Touch_Data = {
+                pX:      iTouch.pageX,
+                pY:      iTouch.pageY,
+                time:    iEvent.timeStamp
+            };
+        }
+    ).bind(
+        $.browser.mobile ? 'touchend touchcancel MSPointerUp' : 'mouseup',
+        function (iEvent) {
+            if (! Touch_Data)  return;
+
+            var iTouch = get_Touch(iEvent);
+
+            var swipeLeft = Touch_Data.pX - iTouch.pageX,
+                swipeTop = Touch_Data.pY - iTouch.pageY,
+                iTime = iEvent.timeStamp - Touch_Data.time;
+
+            if (Math.max(Math.abs(swipeLeft), Math.abs(swipeTop)) > 20)
+                $(iEvent.target).trigger('swipe',  [swipeLeft, swipeTop]);
+            else
+                $(iEvent.target).trigger((iTime > 300) ? 'press' : 'tap');
+        }
+    );
+
+})(self, self.document, self.iQuery);
+
+
+
+/* ---------- DOM/CSS Animation ---------- */
 (function ($) {
 
     var FPS = 20;
@@ -1772,66 +2444,735 @@ self.onerror = function () {
     $.fn.animate = function (CSS_Final, During_Second) {
         var $_This = this;
 
-        $_This.data('animate', 1);
+        $_This.data('_animate_', 1);
 
-        for (var iStyle in CSS_Final)  (function (iName) {
-            var iKeyFrame = KeyFrame($_This.css(iName), CSS_Final[iName], During_Second);
+        $.each(CSS_Final,  function (iName) {
+            var iKeyFrame = KeyFrame($_This.css(iName), this, During_Second);
 
             $.every(1 / FPS,  function () {
-                if ($_This.data('animate') && iKeyFrame.length)
+                if ($_This.data('_animate_') && iKeyFrame.length)
                     $_This.css(iName, iKeyFrame.shift());
                 else {
                     iKeyFrame = null;
                     return false;
                 }
             });
-        })(iStyle);
+        });
 
         return $_This;
     };
 
-    $.fn.stop = function () {
-        return  this.data('animate', 0);
+    $.fx = {interval:  1000 / FPS};
+
+    /* ----- CSS 3 Animation ----- */
+    $('head script').eq(0).before(
+        $('<link />', {
+            rel:     'stylesheet',
+            type:    'text/css',
+            href:    'http://cdn.bootcss.com/animate.css/3.3.0/animate.min.css'
+        })
+    );
+
+    var Animate_End = 'webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend';
+
+    $.fn.cssAnimate = function (iType) {
+        var _Args_ = $.makeArray(arguments).slice(1);
+
+        var iDuring = (! isNaN(parseFloat(_Args_[0]))) && _Args_.shift();
+        var iCallback = (typeof _Args_[0] == 'function') && _Args_.shift();
+        var iLoop = _Args_[0];
+
+        var iClass = 'animated ' + iType + (iLoop ? ' infinite' : '');
+
+        this.bind(Animate_End,  function () {
+            $(this).off(Animate_End).removeClass(iClass);
+
+            if (iCallback)
+                iCallback.apply(this, arguments);
+        });
+
+        if (iDuring) {
+            iDuring = (iDuring / 1000) + 's';
+            this.cssRule({
+                ' ': {
+                       '-moz-animation-duration':    iDuring,
+                    '-webkit-animation-duration':    iDuring,
+                         '-o-animation-duration':    iDuring,
+                        '-ms-animation-duration':    iDuring,
+                            'animation-duration':    iDuring,
+                }
+            });
+        }
+
+        return  this.removeClass('animated').addClass(iClass);
     };
 
-    $.fx = {interval:  1000 / FPS};
+    /* ----- Animation ShortCut ----- */
+    var CSS_Animation = [
+            'fadeIn', 'fadeOut'
+        ];
+
+    function iAnimate(iType) {
+        return  function (iCallback, iDuring, iLoop) {
+                return  this.cssAnimate(iType, iCallback, iDuring, iLoop);
+            };
+    }
+
+    for (var i = 0;  i < CSS_Animation.length;  i++)
+        $.fn[ CSS_Animation[i] ] = iAnimate( CSS_Animation[i] );
+
+    $.fn.stop = function () {
+        return  this.data('_animate_', 0).removeClass('animated');
+    };
 
 })(self.iQuery);
 
 
 
-/* ----- 模态框/遮罩层（全局） v0.3 ----- */
+/* ---------- HTTP Client ---------- */
 (function (BOM, DOM, $) {
 
+    /* ----- XML HTTP Request ----- */
+    function X_Domain(Target_URL) {
+        var iPort = BOM.location.port || (
+                (BOM.location.protocol == 'http:')  &&  80
+            ) || (
+                (BOM.location.protocol == 'https:')  &&  443
+            );
+        Target_URL = Target_URL.match(/^(\w+?(s)?:)?\/\/([\w\d:]+@)?([^\/\:\@]+)(:(\d+))?/);
+
+        if (! Target_URL)  return false;
+        return (
+            (Target_URL[1]  &&  (Target_URL[1] != BOM.location.protocol))  ||
+            (Target_URL[4]  &&  (Target_URL[4] != BOM.location.hostname))  ||
+            (Target_URL[6]  &&  (Target_URL[6] != iPort))
+        );
+    }
+
+    var XHR_Extension = {
+            timeOut:        function (iSecond, iCallback) {
+                var iXHR = this;
+
+                $.wait(iSecond, function () {
+                    iXHR[
+                        (iXHR.$_DOM || iXHR.crossDomain)  ?  'onload'  :  'onreadystatechange'
+                    ] = null;
+                    iXHR.abort();
+                    iCallback.call(iXHR);
+                    iXHR = null;
+                });
+            },
+            responseAny:    function () {
+                var iContent = this.responseText,
+                    iType = this.responseType || 'text/plain';
+
+                switch ( iType.split('/')[1] ) {
+                    case 'plain':    ;
+                    case 'json':     {
+                        var _Content_ = iContent.trim();
+                        try {
+                            iContent = BOM.JSON.parseAll(_Content_);
+                            this.responseType = 'application/json';
+                        } catch (iError) {
+                            if ($.browser.msie != 9)  try {
+                                if (! $.browser.ff)
+                                    iContent = $.parseXML(_Content_);
+                                else if (this.responseXML)
+                                    iContent = this.responseXML;
+                                else
+                                    break;
+                                this.responseType = 'text/xml';
+                            } catch (iError) { }
+                        }
+                        break;
+                    }
+                    case 'xml':      iContent = this.responseXML;
+                }
+
+                return iContent;
+            },
+            retry:          function (Wait_Seconds) {
+                var iXHR = new this.constructor,
+                    iData = this.requestData;
+                iXHR.onready = this.onready;
+                iXHR.open.apply(iXHR, this.requestArgs);
+
+                $.wait(Wait_Seconds, function () {
+                    iXHR.withCredentials = true;
+                    if (typeof iData == 'string')
+                        iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    iXHR.setRequestHeader('Accept', '*/*');
+                    iXHR.send(iData);
+                });
+            }
+        };
+
+    var XHR_Open = BOM.XMLHttpRequest.prototype.open,
+        XHR_Send = BOM.XMLHttpRequest.prototype.send;
+
+    $.extend(BOM.XMLHttpRequest.prototype, XHR_Extension, {
+        open:           function () {
+            this.crossDomain = X_Domain(arguments[1]);
+
+            var iXHR = this;
+            this[
+                this.crossDomain ? 'onload' : 'onreadystatechange'
+            ] = function () {
+                if (! (iXHR.crossDomain || (iXHR.readyState == 4)))  return;
+
+                if (typeof iXHR.onready == 'function')
+                    iXHR.onready.call(iXHR, iXHR.responseAny());
+                iXHR = null;
+            };
+            XHR_Open.apply(this,  this.requestArgs = arguments);
+        },
+        send:    function () {
+            XHR_Send.call(this,  this.requestData = arguments[0]);
+        }
+    });
+
+    if ($.browser.msie < 10)
+        BOM.XDomainRequest.prototype.setRequestHeader = function () {
+            console.warn("IE 8/9 XDR doesn't support Changing HTTP Headers...");
+        };
+
+    /* ----- HTML DOM SandBox ----- */
+    $.fn.sandBox = function () {
+        var iArgs = $.makeArray(arguments);
+
+        var iCallback = (typeof iArgs.slice(-1)[0] == 'function')  &&  iArgs.pop();
+        var iHTML = (! $.isSelector(iArgs[0])) ? '' : iArgs.shift();
+        var iSelector = iArgs[0];
+
+        var iURL = (! iHTML.match(/<.+?>/))  &&  (iHTML.trim() || 'about:blank'),
+            $_iFrame = this.filter('iframe').eq(0);
+
+        if (! $_iFrame.length)
+            $_iFrame = $('<iframe style="display: none"></iframe>');
+
+        $_iFrame.one('load',  function () {
+            var _DOM_ = this.contentWindow.document;
+
+            function Frame_Ready() {
+                if (! (_DOM_.body && _DOM_.body.childNodes.length))
+                    return;
+
+                var $_Content = $(iSelector || 'body > *',  _DOM_);
+                if (! $_Content.length)
+                    $_Content = _DOM_.body.childNodes;
+
+                if (
+                    (typeof iCallback == 'function')  &&
+                    (false === iCallback.call(
+                        $_iFrame[0],  $('head style', _DOM_).add($_Content).clone(true)
+                    ))
+                )
+                    $_iFrame.remove();
+
+                return false;
+            }
+
+            if (! iURL) {
+                $.every(0.04, Frame_Ready);
+                _DOM_.write(iHTML);
+                _DOM_.close();
+            } else
+                Frame_Ready();
+        });
+
+        if (iURL)  $_iFrame.attr('src', iURL);
+
+        return  $_iFrame[0].parentNode ? this : $_iFrame.appendTo(DOM.body);
+    };
+
+    /* ----- DOM HTTP Request ----- */
+    BOM.DOMHttpRequest = function () {
+        this.status = 0;
+        this.readyState = 0;
+        this.responseType = 'text/plain';
+    };
+    BOM.DOMHttpRequest.JSONP = { };
+
+    var Type_Info = $(BOM).data('_type_');
+
+    $.extend(BOM.DOMHttpRequest.prototype, XHR_Extension, {
+        open:                function (iMethod, iTarget) {
+            this.method = iMethod.toUpperCase();
+
+            //  <script />, JSONP
+            if (this.method == 'GET') {
+                this.responseURL = iTarget;
+                return;
+            }
+
+            //  <iframe />
+            var iDHR = this,  $_Form = $(iTarget);
+
+            var $_Button = $_Form.find(':button').attr('disabled', true),
+                iTarget = $_Form.attr('target');
+            if ((! iTarget) || (iTarget in Type_Info.Target)) {
+                iTarget = $.guid('iframe');
+                $_Form.attr('target', iTarget);
+            }
+
+            $('iframe[name="' + iTarget + '"]').sandBox(function () {
+                $(this).on('load',  function () {
+                    $_Button.prop('disabled', false);
+
+                    if (iDHR.readyState)  try {
+                        var $_Content = $(this).contents();
+                        iDHR.responseText = $_Content.find('body').text();
+                        iDHR.status = 200;
+                        iDHR.readyState = 4;
+                        iDHR.onready.call($_Form[0],  iDHR.responseAny(),  $_Content);
+                    } catch (iError) { }
+                });
+            }).attr('name', iTarget);
+
+            this.$_DOM = $_Form;
+            this.requestArgs = arguments;
+        },
+        send:                function () {
+            if (this.method == 'POST')
+                this.$_DOM.submit();    //  <iframe />
+            else {
+                //  <script />, JSONP
+                var iURL = this.responseURL.match(/([^\?=&]+\?|\?)?(\w.+)?/);
+                if (! iURL)  throw 'Illegal URL !';
+
+                var _GUID_ = $.guid(),  iDHR = this;
+
+                BOM.DOMHttpRequest.JSONP[_GUID_] = function () {
+                    if (iDHR.readyState) {
+                        iDHR.status = 200;
+                        iDHR.readyState = 4;
+                        iDHR.onready.apply(iDHR, arguments);
+                    }
+                    delete this[_GUID_];
+                    iDHR.$_DOM.remove();
+                };
+                this.requestData = arguments[0];
+                this.responseURL = iURL[1] + $.param(
+                    $.extend({ }, arguments[0], $.paramJSON(
+                        iURL[2].replace(/(\w+)=\?/,  '$1=DOMHttpRequest.JSONP.' + _GUID_)
+                    ))
+                );
+                this.$_DOM = $('<script />', {src:  this.responseURL}).appendTo(DOM.head);
+            }
+            this.readyState = 1;
+        },
+        setRequestHeader:    function () {
+            console.warn("JSONP/iframe doesn't support Changing HTTP Headers...");
+        },
+        abort:               function () {
+            this.readyState = 0;
+        }
+    });
+
+    /* ----- HTTP Wraped Method ----- */
+    function iHTTP(iMethod, iURL, iData, iCallback) {
+        var iXHR = BOM[
+                (X_Domain(iURL) && ($.browser.msie < 10))  ?  'XDomainRequest' : 'XMLHttpRequest'
+            ];
+
+        if ($.type(iData) == 'HTMLElement') {
+            var $_Form = $(iData);
+            iData = { };
+
+            if ($_Form[0].tagName.toLowerCase() == 'form') {
+                if (! $_Form.find('input[type="file"]').length) {
+                    var _Data_ = $_Form.serializeArray();
+                    for (var i = 0;  i < _Data_.length;  i++)
+                        iData[_Data_[i].name] = _Data_[i].value;
+                } else {
+                    if (! ($.browser.msie < 10))
+                        iData = new FormData($_Form[0]);
+                    else
+                        iXHR = BOM.DOMHttpRequest;
+                }
+            }
+        }
+        if ( $.isPlainObject(iData) )
+            iData = BOM.encodeURI( $.param(iData || { }) );
+
+        iXHR = new iXHR();
+        iXHR.onready = iCallback;
+        iXHR.open(
+            iMethod,
+            ((! iData) && $_Form)  ?  $_Form  :  iURL,
+            true
+        );
+        iXHR.withCredentials = true;
+        if (typeof iData == 'string')
+            iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        iXHR.setRequestHeader('Accept', '*/*');
+        iXHR.send(iData);
+
+        return iXHR;
+    }
+
+    function Idempotent_Args(iURL) {
+        iURL = iURL.split('?');
+        iURL[1] = $.extend(
+            iURL[1] ? $.paramJSON(iURL[1]) : { },  arguments[1]
+        );
+
+        var iPrefetch;
+        $('link[rel="next"], link[rel="prefetch"]').each(function () {
+            if ($.fileName(this.href) == $.fileName(iURL[0]))
+                iPrefetch = true;
+        });
+        if (! iPrefetch)  iURL[1]._ = $.now();
+
+        return  (iURL[0] + '?' + $.param(iURL[1])).trim('?');
+    }
+
+    $.extend({
+        get:         function (iURL, iData, iCallback) {
+            if (typeof iData == 'function') {
+                iCallback = iData;
+                iData = { };
+            }
+            //  XHR
+            if (! iURL.match(/\w+=\?/))
+                return  iHTTP('GET',  Idempotent_Args(iURL, iData),  null,  iCallback);
+
+            //  JSONP
+            var iDHR = new BOM.DOMHttpRequest();
+            iDHR.open('GET', iURL);
+            iDHR.onready = iCallback;
+            return iDHR.send(iData);
+        },
+        post:        function () {
+            var iArgs = $.makeArray(arguments);
+            iArgs.unshift('POST');
+
+            return  iHTTP.apply(BOM, iArgs);
+        },
+        'delete':    function (iURL, iData, iCallback) {
+            if (typeof iData == 'function') {
+                iCallback = iData;
+                iData = { };
+            }
+            return  iHTTP('DELETE',  Idempotent_Args(iURL, iData),  null,  iCallback);
+        },
+        put:         function () {
+            var iArgs = $.makeArray(arguments);
+            iArgs.unshift('PUT');
+
+            return  iHTTP.apply(BOM, iArgs);
+        }
+    });
+
+    $.getJSON = $.get;
+
+    /* ----- Smart HTML Loading ----- */
+    $.fn.load = function (iURL, iData, iCallback) {
+        var $_This = this;
+
+        iURL = iURL.trim().split(/\s+/);
+        iURL[1] = iURL.slice(1).join(' ');
+        iURL.length = 2;
+        if (typeof iData == 'function') {
+            iCallback = iData;
+            iData = null;
+        }
+
+        function Append_Back() {
+            $_This.children().fadeOut();
+            $(arguments[0]).appendTo( $_This.empty() ).fadeIn();
+
+            if (typeof iCallback == 'function')
+                for (var i = 0;  i < $_This.length;  i++)
+                    iCallback.apply($_This[i], arguments);
+        }
+
+        function Load_Back(iHTML) {
+            if (typeof iHTML != 'string')  return;
+
+            if (! iHTML.match(/<\s*(html|head|body)[^>]*>/i)) {
+                Append_Back.apply(this, arguments);
+                return;
+            }
+
+            var _Context_ = [this, $.makeArray(arguments)];
+
+            $(DOM.body).sandBox(iHTML,  iURL[1],  function ($_innerDOM) {
+                _Context_[1].splice(0, 1, $_innerDOM);
+
+                Append_Back.apply(_Context_[0], _Context_[1]);
+
+                $(this).remove();
+            });
+        }
+
+        if (! iData)
+            $.get(iURL[0], Load_Back);
+        else
+            $.post(iURL[0], iData, Load_Back);
+
+        return this;
+    };
+
+    /* ----- Form Element AJAX Submit ----- */
+    $.fn.ajaxSubmit = function (iCallback) {
+        if (! this.length)  return this;
+
+        var $_Form = (
+                (this[0].tagName.toLowerCase() == 'form') ?
+                    this : this.find('form')
+            ).eq(0);
+        if (! $_Form.length)  return this;
+
+        var $_Button = $_Form.find(':button').attr('disabled', true);
+
+        function AJAX_Ready() {
+            $_Button.prop('disabled', false);
+            iCallback.call($_Form[0], arguments[0]);
+        }
+
+        $_Form.on('submit',  function (iEvent) {
+            iEvent.preventDefault();
+            iEvent.stopPropagation();
+            $_Button.attr('disabled', true);
+
+            var iMethod = ($(this).attr('method') || 'Get').toLowerCase();
+
+            if ( this.checkValidity() )  switch (iMethod) {
+                case 'get':       ;
+                case 'delete':
+                    $[iMethod](this.action, AJAX_Ready);    break;
+                case 'post':      ;
+                case 'put':
+                    $[iMethod](this.action, this, AJAX_Ready);
+            } else
+                $_Button.prop('disabled', false);
+        });
+        $_Button.prop('disabled', false);
+
+        return this;
+    };
+
+})(self, self.document, self.iQuery);
+
+
+
+/* ---------- HTML 5 Form Shim ---------- */
+(function ($) {
+
+    if ($.browser.modern && (! $.browser.ios))  return;
+
+    function Value_Check() {
+        var $_This = $(this);
+
+        if ((typeof $_This.attr('required') == 'string')  &&  (! this.value))
+            return false;
+
+        var iRegEx = $_This.attr('pattern');
+        if (iRegEx)  try {
+            return  RegExp(iRegEx).test(this.value);
+        } catch (iError) { }
+
+        if ((this.tagName.toLowerCase() == 'input')  &&  (this.type == 'number')) {
+            var iNumber = Number(this.value),
+                iMin = Number( $_This.attr('min') );
+            if (
+                isNaN(iNumber)  ||
+                (iNumber < iMin)  ||
+                (iNumber > Number( $_This.attr('max') ))  ||
+                ((iNumber - iMin)  %  Number( $_This.attr('step') ))
+            )
+                return false;
+        }
+
+        return true;
+    }
+
+    HTMLInputElement.prototype.checkValidity = Value_Check;
+    HTMLSelectElement.prototype.checkValidity = Value_Check;
+    HTMLTextAreaElement.prototype.checkValidity = Value_Check;
+
+    HTMLFormElement.prototype.checkValidity = function () {
+        var $_Input = $('*[name]:input', this);
+
+        for (var i = 0;  i < $_Input.length;  i++)
+            if (! $_Input[i].checkValidity())
+                return false;
+        return true;
+    };
+
+})(self.iQuery);
+
+
+
+/* ---------- Other Extension ---------- */
+(function (BOM, DOM, $) {
+
+    /* ----- Remote Error Log ----- */
+    var Console_URL = $('head link[rel="console"]').attr('href');
+
+    BOM.onerror = function (iMessage, iURL, iLine, iColumn, iError){
+        $.wait(0,  function () {
+            var iData = {
+                    message:    iMessage,
+                    url:        iURL,
+                    line:       iLine,
+                    column:     iColumn  ||  (BOM.event && BOM.event.errorCharacter)  ||  0
+                };
+
+            if (iError)  iData.stack = String(iError.stack || iError.stacktrace);
+
+            if (Console_URL) {
+                if (iData.stack)
+                    $.post(Console_URL, iData);
+                else
+                    $.get(Console_URL, iData);
+            }
+        });
+
+        return true;
+    };
+
+
+    /* ----- Hash Algorithm (Crypto API Wrapper) ----- */
+    function BufferToString(iBuffer){
+        var iDataView = new DataView(iBuffer),
+            iResult = [ ];
+
+        for (var i = 0, iTemp;  i < iBuffer.byteLength;  i += 4) {
+            iTemp = iDataView.getUint32(i).toString(16);
+            iResult.push(
+                ((iTemp.length == 8) ? '' : '0') + iTemp
+            );
+        }
+        return iResult.join('');
+    }
+
+    $.dataHash = function (iAlgorithm, iData, iCallback, iFailback) {
+        var iCrypto = BOM.crypto || BOM.msCrypto;
+        var iSubtle = iCrypto.subtle || iCrypto.webkitSubtle;
+
+        iAlgorithm = iAlgorithm || 'SHA-512';
+        iFailback = iFailback || iCallback;
+
+        try {
+            iData = iData.split('');
+            for (var i = 0;  i < iData.length;  i++)
+                iData[i] = iData[i].charCodeAt(0);
+
+            var iPromise = iSubtle.digest(
+                    {name:  iAlgorithm},
+                    new Uint8Array(iData)
+                );
+
+            if(typeof iPromise.then == 'function')
+                iPromise.then(
+                    function() {
+                        iCallback.call(this, BufferToString(arguments[0]));
+                    },
+                    iFailback
+                );
+            else
+                iPromise.oncomplete = function(){
+                    iCallback.call(this,  BufferToString( arguments[0].target.result ));
+                };
+        } catch (iError) {
+            iFailback(iError);
+        }
+    };
+
+    /* ----- Page URL of a DOM ----- */
+    $.fn.pagePath = function () {
+        var _PP = this[0].baseURI || this[0].ownerDocument.URL;
+        _PP = _PP.split('/');
+        if (_PP.length > 3) _PP.pop();
+        _PP.push('');
+        return _PP.join('/');
+    };
+
+})(self, self.document, self.iQuery);
+
+
+
+/* ----- 模态框/遮罩层（全局） v0.4 ----- */
+(function (BOM, DOM, $) {
+
+    var $_BOM = $(BOM);
+
     BOM.iShadowCover = {
-        $_DOM:      $('<div id="iSC"><div /></div>'),
-        open:     function (iContent, closeCB) {
+        $_DOM:     $('<div class="Cover"><div /></div>'),
+        CSS:       {
+            'body > .Cover': {
+                position:      'fixed',
+                'z-index':     2000000010,
+                top:           0,
+                left:          0,
+                width:         '100%',
+                height:        '100%',
+                background:    'rgba(0, 0, 0, 0.7)',
+                display:       'table'
+            },
+            'body > .Cover > *': {
+                display:             'table-cell',
+                'vertical-align':    'middle',
+                'text-align':        'center'
+            }
+        },
+        closed:    true,
+        init:      function () {
+            var _This_ = BOM.iShadowCover;
+
+            if (this == _This_) return;
+
+            $.cssRule(_This_.CSS);
+
+            _This_.$_DOM.click(function () {
+                if (! _This_.locked) {
+                    if (arguments[0].target.parentNode === this)
+                        _This_.close();
+                } else
+                    _This_.Content.focus();
+            });
+        },
+        open:      function (iContent, iStyle, closeCB) {
             this.locked = ($.type(iContent) == 'Window');
 
-            if (! this.locked)
+            if (! this.locked) {
+                if (! this.closed)  this.close();
                 $(this.$_DOM[0].firstChild).append(iContent);
-            else
+            } else
                 this.Content = iContent;
 
-            this.$_DOM.height( $(BOM).height() ).css('display', 'table');
+            if (iStyle) {
+                var _This_ = this;
+                this.$_DOM.cssRule(iStyle,  function () {
+                    _This_.$_CSS = $(arguments[0].ownerNode);
+                });
+            }
+            this.$_DOM.height( $_BOM.height() ).prependTo(DOM.body);
+
             this.closed = false;
             this.onclose = closeCB;
 
             return iContent;
         },
-        close:    function () {
-            this.$_DOM.hide().attr('class', '');
+        close:     function () {
+            if (this.closed) return;
+
+            this.$_DOM.detach();
             $(this.$_DOM[0].firstChild).empty();
+            if (this.$_CSS && this.$_CSS[0].parentNode)
+                this.$_CSS.remove();
+
             this.closed = true;
             if (this.onclose)
                 this.onclose.call(this.$_DOM[0]);
         }
     };
 
-    $(DOM).ready(function () {
-        $(this.body.firstElementChild || this.body.firstChild)
-            .before(BOM.iShadowCover.$_DOM);
-    }).keydown(function () {
+    $(DOM).ready(BOM.iShadowCover.init).keydown(function () {
         if (BOM.iShadowCover.closed) return;
 
         if (! BOM.iShadowCover.locked) {
@@ -1839,32 +3180,6 @@ self.onerror = function () {
                 BOM.iShadowCover.close();
         } else
             BOM.iShadowCover.Content.focus();
-    });
-
-    BOM.iShadowCover.$_DOM.click(function () {
-        if (! BOM.iShadowCover.locked) {
-            if (arguments[0].target.parentNode === this)
-                BOM.iShadowCover.close();
-        } else
-            BOM.iShadowCover.Content.focus();
-    });
-
-    $.cssRule({
-        '#iSC': {
-            position:      'fixed',
-            'z-index':     2000000010,
-            top:           0,
-            left:          0,
-            width:         '100%',
-            height:        '100%',
-            background:    'rgba(0, 0, 0, 0.7)',
-            display:       'none'
-        },
-        '#iSC > *': {
-            display:             'table-cell',
-            'vertical-align':    'middle',
-            'text-align':        'center'
-        }
     });
 
     function iOpen(iURL, Scale, iCallback) {
@@ -1919,16 +3234,21 @@ self.onerror = function () {
 
     var old_MD = BOM.showModalDialog;
 
-    BOM.showModalDialog = function (iContent, iScale, CloseBack) {
+    BOM.showModalDialog = function () {
         if (! arguments.length)
             throw 'A URL Argument is needed unless...';
-        if ($.type(iScale) == 'Function') {
-            CloseBack = iScale;
-            iScale = null;
-        } else if ($.type(CloseBack) == 'String')
+        else
+            var iArgs = $.makeArray(arguments);
+
+        var iContent = iArgs.shift();
+        var iScale = (typeof iArgs[0] == 'number') && iArgs.shift();
+        var iStyle = $.isPlainObject(iArgs[0]) && iArgs.shift();
+        var CloseBack = (typeof iArgs[0] == 'function') && iArgs.shift();
+
+        if (typeof iArgs[0] == 'string')
             return old_MD.apply(BOM, arguments);
 
-        if ($.type(iContent) == 'String') {
+        if (typeof iContent == 'string') {
             if (! iContent.match(/^(\w+:)?\/\/[\w\d\.:@]+/)) {
                 var iTitle = iContent;
                 iContent = 'about:blank';
@@ -1942,7 +3262,7 @@ self.onerror = function () {
                     return false;
                 }
             });
-            $(BOM).bind('unload', function () {
+            $_BOM.bind('unload', function () {
                 iContent.close();
             });
             BOM.new_Window_Fix.call(iContent, function () {
@@ -1960,10 +3280,10 @@ self.onerror = function () {
                     }
                 });
                 if (iTitle)
-                    $(this.document.head).append('title', {text:  iTitle});
+                    $('<title />', {text:  iTitle}).appendTo(this.document.head);
             });
         } else
-            BOM.iShadowCover.open(iContent, CloseBack);
+            BOM.iShadowCover.open(iContent, iStyle, CloseBack);
 
         return iContent;
     };
