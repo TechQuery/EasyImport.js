@@ -748,7 +748,7 @@
                 DOM.createElement( iTag[1] )
             ];
 
-        if ((iNew.length == 1)  &&  (iNew[0].nodeType = 1)  &&  AttrList)
+        if ((iNew.length == 1)  &&  (iNew[0].nodeType == 1)  &&  AttrList)
             _Object_.each(AttrList,  function (iKey) {
                 try {
                     switch (iKey) {
@@ -2323,12 +2323,11 @@
     $.start('DOM_Ready');
 
     function DOM_Ready_Event() {
-        if (DOM.isReady) return;
-
-        var _DOM_Ready_ = (DOM.readyState == 'complete') &&
-                DOM.body  &&  DOM.body.lastChild  &&  DOM.getElementById;
-
-        if ((this !== DOM) && (! _DOM_Ready_))
+        if (DOM.isReady || (
+            (this !== DOM)  &&  (
+                (DOM.readyState != 'complete')  ||  (! DOM.body.lastChild)
+            )
+        ))
             return;
 
         DOM.isReady = true;
@@ -3071,94 +3070,112 @@
 
 
 
-/* ----- 模态框/遮罩层（全局） v0.4 ----- */
+/* ---------- 模态框/遮罩层  v0.5 ---------- */
 (function (BOM, DOM, $) {
 
-    var $_BOM = $(BOM);
+    /* ----- 模态框/遮罩层 对象 ----- */
 
-    BOM.iShadowCover = {
-        $_DOM:     $('<div class="Cover"><div /></div>'),
-        CSS:       {
-            'body > .Cover': {
-                position:      'fixed',
-                'z-index':     2000000010,
-                top:           0,
-                left:          0,
-                width:         '100%',
-                height:        '100%',
-                background:    'rgba(0, 0, 0, 0.7)',
-                display:       'table'
+    var $_BOM = $(BOM),
+        $_DOM = $(DOM).ready(function () {
+            $.cssRule({
+                'body > .Cover': {
+                    position:      'fixed',
+                    'z-index':     2000000010,
+                    top:           0,
+                    left:          0,
+                    width:         '100%',
+                    height:        '100%',
+                    background:    'rgba(0, 0, 0, 0.7)',
+                    display:       'table'
+                },
+                'body > .Cover > *': {
+                    display:             'table-cell',
+                    'vertical-align':    'middle',
+                    'text-align':        'center'
+                }
+            });
+        }),
+        _Instance_ = [ ];
+
+    function ModalWindow(iContent, iStyle, closeCB) {
+        $.extend(this, {
+            opener:      BOM,
+            self:        this,
+            closed:      false,
+            onunload:    closeCB,
+            frames:      [ ],
+            document:    {
+                body:           $('<div class="Cover"><div /></div>').height( $_BOM.height() )[0],
+                styleSheets:    [ ]
             },
-            'body > .Cover > *': {
-                display:             'table-cell',
-                'vertical-align':    'middle',
-                'text-align':        'center'
-            }
-        },
-        closed:    true,
-        init:      function () {
-            var _This_ = BOM.iShadowCover;
+            locked:      ($.type(iContent) == 'Window')
+        });
+        _Instance_.push(this);
 
-            if (this == _This_) return;
+        var _This_ = this;
 
-            $.cssRule(_This_.CSS);
-
-            _This_.$_DOM.click(function () {
+        //  遮罩层
+        var $_Modal_Window = $(this.document.body).click(function () {
                 if (! _This_.locked) {
                     if (arguments[0].target.parentNode === this)
                         _This_.close();
                 } else
-                    _This_.Content.focus();
+                    _This_.frames[0].focus();
+            }).appendTo('body');
+
+        if (iStyle)
+            $_Modal_Window.cssRule(iStyle,  function () {
+                _This_.document.styleSheets.push(arguments[0]);
             });
-        },
-        open:      function (iContent, iStyle, closeCB) {
-            this.locked = ($.type(iContent) == 'Window');
 
-            if (! this.locked) {
-                if (! this.closed)  this.close();
-                $(this.$_DOM[0].firstChild).append(iContent);
-            } else
-                this.Content = iContent;
-
-            if (iStyle) {
-                var _This_ = this;
-                this.$_DOM.cssRule(iStyle,  function () {
-                    _This_.$_CSS = $(arguments[0].ownerNode);
-                });
-            }
-            this.$_DOM.height( $_BOM.height() ).prependTo(DOM.body);
-
-            this.closed = false;
-            this.onclose = closeCB;
-
-            return iContent;
-        },
-        close:     function () {
-            if (this.closed) return;
-
-            this.$_DOM.detach();
-            $(this.$_DOM[0].firstChild).empty();
-            if (this.$_CSS && this.$_CSS[0].parentNode)
-                this.$_CSS.remove();
-
-            this.closed = true;
-            if (this.onclose)
-                this.onclose.call(this.$_DOM[0]);
+        //  模态框 (DOM)
+        if (! this.locked) {
+            $($_Modal_Window[0].firstChild).append(iContent);
+            return;
         }
+
+        //  模态框 (BOM)
+        this.frames[0] = iContent;
+
+        $.every(0.2,  function () {
+            if (iContent.closed) {
+                _This_.close();
+                return false;
+            }
+        });
+        $_BOM.bind('unload',  function () {
+            iContent.close();
+        });
+    }
+
+    ModalWindow.prototype.close = function () {
+        if (this.closed)  return;
+
+        $(this.document.body).remove();
+
+        $(this.document.styleSheets[0].ownerNode).remove();
+
+        _Instance_.splice(_Instance_.indexOf(this), 1);
+
+        this.closed = true;
+
+        if (typeof this.onunload == 'function')
+            this.onunload.call(this.document.body);
     };
 
-    $(DOM).ready(BOM.iShadowCover.init).keydown(function () {
-        if (BOM.iShadowCover.closed) return;
-
-        if (! BOM.iShadowCover.locked) {
-            if (arguments[0].which == 27)
-                BOM.iShadowCover.close();
-        } else
-            BOM.iShadowCover.Content.focus();
+    $_DOM.keydown(function () {
+        for (var i = 0;  i < _Instance_.length;  i++)
+            if (! _Instance_[i].locked) {
+                if (arguments[0].which == 27)
+                    _Instance_[i].close();
+            } else
+                _Instance_[i].frames[0].focus();
     });
 
+    /* ----- 通用新窗口 ----- */
+
     function iOpen(iURL, Scale, iCallback) {
-        Scale = (Scale > 0) ? Scale : 3;
+        Scale = (Scale > 0)  ?  Scale  :  3;
         var Size = {
             height:    BOM.screen.height / Scale,
             width:     BOM.screen.width / Scale
@@ -3189,12 +3206,10 @@
                     (iEvent.shiftKey && (iKeyCode == 121))     //  Shift + F10
                 )
                     return false;
-            }).bind('contextmenu', function () {
-                return false;
             }).mousedown(function () {
                 if (arguments[0].which == 3)
                     return false;
-            });
+            }).bind('contextmenu', false);
         });
 
         if (iCallback)
@@ -3207,13 +3222,15 @@
         return new_Window;
     }
 
+    /* ----- showModalDialog 扩展 ----- */
+
     var old_MD = BOM.showModalDialog;
 
     BOM.showModalDialog = function () {
         if (! arguments.length)
             throw 'A URL Argument is needed unless...';
-        else
-            var iArgs = $.makeArray(arguments);
+
+        var iArgs = $.makeArray(arguments);
 
         var iContent = iArgs.shift();
         var iScale = (typeof iArgs[0] == 'number') && iArgs.shift();
@@ -3221,26 +3238,17 @@
         var CloseBack = (typeof iArgs[0] == 'function') && iArgs.shift();
 
         if (typeof iArgs[0] == 'string')
-            return old_MD.apply(BOM, arguments);
+            return  (old_MD || BOM.open).apply(BOM, arguments);
 
         if (typeof iContent == 'string') {
             if (! iContent.match(/^(\w+:)?\/\/[\w\d\.:@]+/)) {
                 var iTitle = iContent;
                 iContent = 'about:blank';
             }
-            iContent = BOM.iShadowCover.open(
+            iContent = new ModalWindow(
                 iOpen(iContent, iScale, CloseBack)
             );
-            $.every(0.2, function () {
-                if (iContent.closed) {
-                    BOM.iShadowCover.close();
-                    return false;
-                }
-            });
-            $_BOM.bind('unload', function () {
-                iContent.close();
-            });
-            BOM.new_Window_Fix.call(iContent, function () {
+            BOM.new_Window_Fix.call(iContent.frames[0], function () {
                 this.iTime = {
                     _Root_:    this,
                     now:       $.now,
@@ -3258,7 +3266,7 @@
                     $('<title />', {text:  iTitle}).appendTo(this.document.head);
             });
         } else
-            BOM.iShadowCover.open(iContent, iStyle, CloseBack);
+            iContent = new ModalWindow(iContent, iStyle, CloseBack);
 
         return iContent;
     };
@@ -3270,7 +3278,7 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.2  (2015-9-9)  Stable
+//      [Version]    v1.2  (2015-9-10)  Stable
 //
 //      [Usage]      A Asynchronous & Responsive Loader
 //                   for Resource File in Web Browser.
@@ -3422,7 +3430,7 @@
     }
 /* ----------- Open API ----------- */
 
-    var Load_Times = 0;
+    var Load_Times = 0,  Load_Cover;
 
     function Load_End() {
         if ( Load_Times++ )  return;
@@ -3445,7 +3453,7 @@
             ).toFixed(2) + ' %'
         ].join("\n\n"));
 
-        BOM.iShadowCover.close();
+        Load_Cover.close();
 
         $(DOM.body).trigger('ScriptLoad');
     }
@@ -3475,7 +3483,7 @@
 /* ----------- Practical Extension ----------- */
 
     $_DOM.ready(function () {
-        BOM.showModalDialog($('<h1>Loading...</h1>'), {
+        Load_Cover = BOM.showModalDialog($('<h1>Loading...</h1>'), {
             ' ': {
                 background:    'darkgray'
             },
