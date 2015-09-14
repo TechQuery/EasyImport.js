@@ -599,7 +599,7 @@
                     iElement.removeChild(iChild[0]);
             }
 
-            return iElement.childNodes;
+            return _Object_.makeArray(iElement.childNodes);
         }
     };
 
@@ -726,16 +726,16 @@
             ];
 
         if ((iNew.length == 1)  &&  (iNew[0].nodeType == 1)  &&  AttrList)
-            _Object_.each(AttrList,  function (iKey) {
+            _Object_.each(AttrList,  function (iKey, iValue) {
                 try {
                     switch (iKey) {
-                        case 'text':     _DOM_.innerText.set(iNew[0], this);  break;
-                        case 'html':     _DOM_.innerHTML.set(iNew[0], this);  break;
-                        case 'style':    if ( _Object_.isPlainObject(this) ) {
-                            _DOM_.operate('Style', iNew, this);
+                        case 'text':     _DOM_.innerText.set(iNew[0], iValue);  break;
+                        case 'html':     _DOM_.innerHTML.set(iNew[0], iValue);  break;
+                        case 'style':    if ( _Object_.isPlainObject(iValue) ) {
+                            _DOM_.operate('Style', iNew, iValue);
                             break;
                         }
-                        default:         _DOM_.operate('Attribute', iNew, iKey, this);
+                        default:         _DOM_.operate('Attribute', iNew, iKey, iValue);
                     }
                 } catch (iError) {
                     console.error(iError);
@@ -3075,7 +3075,7 @@
         }),
         _Instance_ = [ ];
 
-    function ModalWindow(iContent, iStyle, closeCB) {
+    BOM.ModalWindow = function (iContent, iStyle, closeCB) {
         $.extend(this, {
             opener:      BOM,
             self:        this,
@@ -3124,9 +3124,9 @@
         $_BOM.bind('unload',  function () {
             iContent.close();
         });
-    }
+    };
 
-    ModalWindow.prototype.close = function () {
+    BOM.ModalWindow.prototype.close = function () {
         if (this.closed)  return;
 
         $(this.document.body).remove();
@@ -3141,13 +3141,19 @@
             this.onunload.call(this.document.body);
     };
 
+    BOM.ModalWindow.clear = function () {
+        for (var i = _Instance_.length - 1;  i > -1;  i--)
+            _Instance_[i].close();
+    };
+
     $_DOM.keydown(function () {
-        for (var i = 0;  i < _Instance_.length;  i++)
-            if (! _Instance_[i].locked) {
-                if (arguments[0].which == 27)
-                    _Instance_[i].close();
-            } else
-                _Instance_[i].frames[0].focus();
+        var Last_Instance = _Instance_[_Instance_.length - 1];
+
+        if (! Last_Instance.locked) {
+            if (arguments[0].which == 27)
+                Last_Instance.close();
+        } else
+            Last_Instance.frames[0].focus();
     });
 
     /* ----- 通用新窗口 ----- */
