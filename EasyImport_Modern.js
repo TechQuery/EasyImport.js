@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-9-15)  Stable
+//      [Version]    v1.0  (2015-9-22)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -527,22 +527,6 @@
         }
     };
 
-    /* ----- DOM Offset ----- */
-    function DOM_Offset() {
-        var iOffset = {
-                left:    this[0].offsetLeft,
-                top:     this[0].offsetTop
-            };
-
-        Object_Seek.call(this[0], 'offsetParent', function () {
-            iOffset.left += this.offsetLeft;
-            iOffset.top += this.offsetTop;
-        });
-
-        return iOffset;
-    }
-
-
 /* ---------- DOM Event ---------- */
     _DOM_.operate('Data',  [BOM],  '_timer_',  { });
 
@@ -963,6 +947,27 @@
     });
 
     /* ----- iQuery Instance Method ----- */
+    function DOM_Size(iName) {
+        iName = {
+            scroll:    'scroll' + iName,
+            client:    'client' + iName,
+            css:       iName.toLowerCase()
+        };
+
+        return  function () {
+            switch ( $.type(this[0]) ) {
+                case 'Document':    return  Math.max(
+                        this[0].documentElement[iName.scroll],
+                        this[0].body[iName.scroll]
+                    );  break;
+                case 'Window':      return  this[0].innerWidth || Math.max(
+                        this[0].document.documentElement[iName.client],
+                        this[0].document.body[iName.client]
+                    );  break;
+                default:            return  this.css(iName.css, arguments[0]);
+            }
+        };
+    }
     function DOM_Scroll(iName) {
         iName = {
             scroll:    'scroll' + iName,
@@ -1254,41 +1259,30 @@
             }
             return this;
         },
-        width:              function () {
-            switch ( $.type(this[0]) ) {
-                case 'Document':    return  Math.max(
-                        DOM.documentElement.scrollWidth,
-                        DOM.body.scrollWidth
-                    );  break;
-                case 'Window':      return  BOM.innerWidth || Math.max(
-                        DOM.documentElement.clientWidth,
-                        DOM.body.clientWidth
-                    );  break;
-                default:            return  this.css('width', arguments[0]);
-            }
-        },
-        height:             function () {
-            switch ( $.type(this[0]) ) {
-                case 'Document':    return  Math.max(
-                        DOM.documentElement.scrollHeight,
-                        DOM.body.scrollHeight
-                    );  break;
-                case 'Window':      return  BOM.innerHeight || Math.max(
-                        DOM.documentElement.clientHeight,
-                        DOM.body.clientHeight
-                    );  break;
-                default:            return  this.css('height', arguments[0]);
-            }
-        },
+        width:              DOM_Size('Width'),
+        height:             DOM_Size('Height'),
         scrollTop:          DOM_Scroll('Top'),
         scrollLeft:         DOM_Scroll('Left'),
         position:           function () {
             return  {
-                    left:    this[0].offsetLeft,
-                    top:     this[0].offsetTop
-                };
+                left:    this[0].offsetLeft,
+                top:     this[0].offsetTop
+            };
         },
-        offset:             DOM_Offset,
+        offset:             function (iCoordinate) {
+            if ( $.isPlainObject(iCoordinate) )
+                return this.css($.extend({
+                    position:    'fixed'
+                }, iCoordinate));
+
+            var _BOM_ = this[0].ownerDocument.defaultView,
+                iBCR = this[0].getBoundingClientRect();
+
+            return {
+                left:    parseFloat( (_BOM_.pageXOffset + iBCR.left).toFixed(4) ),
+                top:     parseFloat( (_BOM_.pageYOffset + iBCR.top).toFixed(4) )
+            };
+        },
         addClass:           function (new_Class) {
             if (typeof new_Class != 'string')  return this;
 
@@ -2343,7 +2337,7 @@
         iXHR.withCredentials = true;
         if (typeof iData == 'string')
             iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-//        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         iXHR.setRequestHeader('Accept', '*/*');
         iXHR.send(iData);
 
@@ -2607,69 +2601,95 @@
 
 
 
-/* ---------- 模态框/遮罩层  v0.5 ---------- */
+/* ---------- DOM 遮罩层  v0.2 ---------- */
 (function (BOM, DOM, $) {
 
-    /* ----- 模态框/遮罩层 对象 ----- */
+    $(DOM).ready(function () {
+        $.cssRule({
+            '.ShadowCover': {
+                position:      'absolute',
+//              'z-index':     2000000010,
+                top:           0,
+                left:          0,
+                width:         '100%',
+                height:        '100%',
+                background:    'rgba(0, 0, 0, 0.7)',
+                display:       'table'
+            },
+            '.ShadowCover > *': {
+                display:             'table-cell',
+                'vertical-align':    'middle',
+                'text-align':        'center'
+            }
+        });
+    });
 
-    var $_BOM = $(BOM),
-        $_DOM = $(DOM).ready(function () {
-            $.cssRule({
-                'body > .Cover': {
-                    position:      'fixed',
-                    'z-index':     2000000010,
-                    top:           0,
-                    left:          0,
-                    width:         '100%',
-                    height:        '100%',
-                    background:    'rgba(0, 0, 0, 0.7)',
-                    display:       'table'
-                },
-                'body > .Cover > *': {
-                    display:             'table-cell',
-                    'vertical-align':    'middle',
-                    'text-align':        'center'
-                }
+    function ShadowCover($_Container, iContent, CSS_Rule) {
+        var _This_ = this;
+
+        this.$_Cover = $('<div class="ShadowCover"><div /></div>');
+
+        if (iContent)  $(this.$_Cover.firstChild).append(iContent);
+
+        this.$_Cover.appendTo($_Container);
+
+        if ( $.isPlainObject(CSS_Rule) )
+            this.$_Cover.cssRule(CSS_Rule,  function () {
+                _This_.$_Style = $(arguments[0].ownerNode);
             });
-        }),
-        _Instance_ = [ ];
+    }
+    ShadowCover.prototype.close = function () {
+        this.$_Cover.remove();
+        this.$_Style.remove();
+    };
+
+    $.fn.shadowCover = function () {
+        var iArgs = $.makeArray(arguments).reverse();
+
+        var More_Logic = (typeof iArgs[0] == 'function')  &&  iArgs.shift();
+        var CSS_Rule = $.isPlainObject(iArgs[0]) && iArgs.shift();
+        var iContent = iArgs[0];
+
+        for (var i = 0;  i < this.length;  i++)
+            More_Logic.call(this[i],  new ShadowCover($(this[i]), iContent, CSS_Rule));
+
+        return this;
+    };
+
+})(self, self.document, self.iQuery);
+
+
+
+/* ---------- DOM/BOM 模态框  v0.4 ---------- */
+(function (BOM, DOM, $) {
+
+    var $_BOM = $(BOM),  $_DOM = $(DOM),  _Instance_ = [ ];
 
     BOM.ModalWindow = function (iContent, iStyle, closeCB) {
-        $.extend(this, {
+        _Instance_.push($.extend(this, {
             opener:      BOM,
             self:        this,
             closed:      false,
             onunload:    closeCB,
             frames:      [ ],
-            document:    {
-                body:           $('<div class="Cover"><div /></div>').height( $_BOM.height() )[0],
-                styleSheets:    [ ]
-            },
+            document:    { },
             locked:      ($.type(iContent) == 'Window')
-        });
-        _Instance_.push(this);
+        }));
 
         var _This_ = this;
 
-        //  遮罩层
-        var $_Modal_Window = $(this.document.body).click(function () {
+        $('body').shadowCover(this.locked ? null : iContent,  iStyle,  function () {
+            _This_.__ShadowCover__ = arguments[0];
+
+            _This_.document.body = arguments[0].$_Cover.click(function () {
                 if (! _This_.locked) {
                     if (arguments[0].target.parentNode === this)
                         _This_.close();
                 } else
                     _This_.frames[0].focus();
-            }).appendTo('body');
-
-        if (iStyle)
-            $_Modal_Window.cssRule(iStyle,  function () {
-                _This_.document.styleSheets.push(arguments[0]);
-            });
-
-        //  模态框 (DOM)
-        if (! this.locked) {
-            $($_Modal_Window[0].firstChild).append(iContent);
-            return;
-        }
+            }).height( $_BOM.height() )[0];
+        });
+        if (! this.locked)  return;
 
         //  模态框 (BOM)
         this.frames[0] = iContent;
@@ -2688,9 +2708,7 @@
     BOM.ModalWindow.prototype.close = function () {
         if (this.closed)  return;
 
-        $(this.document.body).remove();
-
-        $(this.document.styleSheets[0].ownerNode).remove();
+        this.__ShadowCover__.close();
 
         _Instance_.splice(_Instance_.indexOf(this), 1);
 
@@ -2822,7 +2840,7 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.2  (2015-9-10)  Stable
+//      [Version]    v1.2  (2015-9-22)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -3037,8 +3055,9 @@
         $_Lazy.each(function () {
             var Off_Top = $(this).offset().top;
 
-            var i = (Off_Top < VP_Height)  ?  0  :  (Off_Top - VP_Height);
-
+            var i = Math.round(
+                    (Off_Top < VP_Height)  ?  0  :  (Off_Top - VP_Height)
+                );
             for (;  i < Off_Top;  i++)
                 if (! Lazy_List[i])
                     Lazy_List[i] = [this];
