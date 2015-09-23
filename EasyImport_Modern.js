@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-9-22)  Stable
+//      [Version]    v1.0  (2015-9-23)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -950,6 +950,7 @@
     function DOM_Size(iName) {
         iName = {
             scroll:    'scroll' + iName,
+            inner:     'inner' + iName,
             client:    'client' + iName,
             css:       iName.toLowerCase()
         };
@@ -960,7 +961,7 @@
                         this[0].documentElement[iName.scroll],
                         this[0].body[iName.scroll]
                     );  break;
-                case 'Window':      return  this[0].innerWidth || Math.max(
+                case 'Window':      return  this[0][iName.inner] || Math.max(
                         this[0].document.documentElement[iName.client],
                         this[0].document.body[iName.client]
                     );  break;
@@ -2608,7 +2609,6 @@
         $.cssRule({
             '.ShadowCover': {
                 position:      'absolute',
-//              'z-index':     2000000010,
                 top:           0,
                 left:          0,
                 width:         '100%',
@@ -2623,24 +2623,34 @@
             }
         });
     });
+    var _Instance_ = [ ];
 
     function ShadowCover($_Container, iContent, CSS_Rule) {
         var _This_ = this;
 
         this.$_Cover = $('<div class="ShadowCover"><div /></div>');
 
-        if (iContent)  $(this.$_Cover.firstChild).append(iContent);
+        if (iContent)  $(this.$_Cover[0].firstChild).append(iContent);
 
-        this.$_Cover.appendTo($_Container);
+        this.$_Cover.appendTo($_Container).zIndex('+');
 
         if ( $.isPlainObject(CSS_Rule) )
             this.$_Cover.cssRule(CSS_Rule,  function () {
                 _This_.$_Style = $(arguments[0].ownerNode);
             });
+        _Instance_.push(this);
     }
+
     ShadowCover.prototype.close = function () {
         this.$_Cover.remove();
-        this.$_Style.remove();
+        if (this.$_Style)  this.$_Style.remove();
+
+        _Instance_.splice(_Instance_.indexOf(this), 1);
+    };
+
+    ShadowCover.clear = function () {
+        for (var i = _Instance_.length - 1;  i > -1;  i--)
+            _Instance_[i].close();
     };
 
     $.fn.shadowCover = function () {
@@ -2650,11 +2660,15 @@
         var CSS_Rule = $.isPlainObject(iArgs[0]) && iArgs.shift();
         var iContent = iArgs[0];
 
-        for (var i = 0;  i < this.length;  i++)
-            More_Logic.call(this[i],  new ShadowCover($(this[i]), iContent, CSS_Rule));
+        for (var i = 0, iCover;  i < this.length;  i++) {
+            iCover = new ShadowCover($(this[i]), iContent, CSS_Rule);
 
+            if (More_Logic)  More_Logic.call(this[i], iCover);
+        }
         return this;
     };
+
+    $.shadowCover = ShadowCover;
 
 })(self, self.document, self.iQuery);
 
@@ -2663,10 +2677,10 @@
 /* ---------- DOM/BOM 模态框  v0.4 ---------- */
 (function (BOM, DOM, $) {
 
-    var $_BOM = $(BOM),  $_DOM = $(DOM),  _Instance_ = [ ];
+    var $_BOM = $(BOM),  $_DOM = $(DOM);
 
     BOM.ModalWindow = function (iContent, iStyle, closeCB) {
-        _Instance_.push($.extend(this, {
+        arguments.callee.lastInstance = $.extend(this, {
             opener:      BOM,
             self:        this,
             closed:      false,
@@ -2674,7 +2688,7 @@
             frames:      [ ],
             document:    { },
             locked:      ($.type(iContent) == 'Window')
-        }));
+        });
 
         var _This_ = this;
 
@@ -2710,28 +2724,21 @@
 
         this.__ShadowCover__.close();
 
-        _Instance_.splice(_Instance_.indexOf(this), 1);
-
         this.closed = true;
 
         if (typeof this.onunload == 'function')
             this.onunload.call(this.document.body);
     };
 
-    BOM.ModalWindow.clear = function () {
-        for (var i = _Instance_.length - 1;  i > -1;  i--)
-            _Instance_[i].close();
-    };
-
     $_DOM.keydown(function () {
-        var Last_Instance = _Instance_[_Instance_.length - 1];
-        if (! Last_Instance)  return;
+        var _Instance_ = BOM.ModalWindow.lastInstance;
+        if (! _Instance_)  return;
 
-        if (! Last_Instance.locked) {
+        if (! _Instance_.locked) {
             if (arguments[0].which == 27)
-                Last_Instance.close();
+                _Instance_.close();
         } else
-            Last_Instance.frames[0].focus();
+            _Instance_.frames[0].focus();
     });
 
     /* ----- 通用新窗口 ----- */
@@ -2791,6 +2798,8 @@
     BOM.showModalDialog = function () {
         if (! arguments.length)
             throw 'A URL Argument is needed unless...';
+        else if (BOM.ModalWindow.lastInstance)
+            throw 'A ModalWindow Instance is running... (Please close it first.)';
 
         var iArgs = $.makeArray(arguments);
 
