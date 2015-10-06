@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-9-23)  Stable
+//      [Version]    v1.0  (2015-10-7)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -185,15 +185,21 @@
                 return  iValue && (iValue.constructor === Object);
             },
             each:             function (Arr_Obj, iEvery) {
-                if (Arr_Obj) {
-                    if (typeof Arr_Obj.length == 'number') {
-                        for (var i = 0;  i < Arr_Obj.length;  i++)
+                if (Arr_Obj)
+                    if (typeof Arr_Obj.length == 'number')
+                        for (var i = 0;  i < Arr_Obj.length;  i++)  try {
                             if (iEvery.call(Arr_Obj[i], i, Arr_Obj[i]) === false)
                                 break;
-                    } else  for (var iKey in Arr_Obj)
-                        if (iEvery.call(Arr_Obj[iKey], iKey, Arr_Obj[iKey]) === false)
-                            break;
-                }
+                        } catch (iError) {
+                            console.log(iError);
+                        }
+                    else
+                        for (var iKey in Arr_Obj)  try {
+                            if (iEvery.call(Arr_Obj[iKey], iKey, Arr_Obj[iKey]) === false)
+                                break;
+                        } catch (iError) {
+                            console.log(iError);
+                        }
                 return Arr_Obj;
             },
             extend:           function () {
@@ -260,6 +266,7 @@
                     if (this.inArray(iArray, iArray[i]) == i)
                         iResult.push( iArray[i] );
 
+                iResult.reverse();
                 return iResult;
             }
         };
@@ -583,19 +590,22 @@
         var iHandler = (_DOM_.operate('Data', [this], '_event_') || { })[iEvent.type];
         if (! iHandler)  return;
 
-        var Trigger_Data = _DOM_.operate('Data', [this], '_trigger_'),
+        var This_DOM = this,
+            Handler_Args = [iEvent].concat( _DOM_.operate('Data', [this], '_trigger_') ),
             iReturn;
 
-        for (var i = 0, _Return_;  i < iHandler.length;  i++) {
-            if ( iHandler[i] )
-                _Return_ = iHandler[i].apply(this, [iEvent].concat(Trigger_Data));
-            else if (iHandler[i] === false)
+        _Object_.each(iHandler,  function () {
+            var _Return_;
+
+            if (this)
+                _Return_ = this.apply(This_DOM, Handler_Args);
+            else if (this === false)
                 _Return_ = false;
             else
-                continue;
+                return;
 
             if (iReturn !== false)  iReturn = _Return_;
-        }
+        });
 
         _DOM_.operate('Data', [this], '_trigger_', null);
 
@@ -1436,13 +1446,14 @@
             iHandler = iHandler && iHandler[arguments[0]];
             if (! iHandler)  return;
 
-            var iArgs = $.makeArray(arguments),  iReturn;
+            var This_DOM = this[0],  iReturn,
+                iArgs = $.makeArray(arguments);
             iArgs.unshift([ ]);
-            for (var i = 0;  i < iHandler.length;  i++)
-                iReturn = iHandler[i].apply(
-                    this[0],  Array_Concat.apply(BOM, iArgs)
+            $.each(iHandler,  function () {
+                iReturn = this.apply(
+                    This_DOM,  Array_Concat.apply(BOM, iArgs)
                 );
-
+            });
             return iReturn;
         },
         clone:              function (iDeep) {
@@ -1715,20 +1726,17 @@
             iRule = iMedia;
             iMedia = null;
         }
-
         var CSS_Text = CSS_Rule2Text(iRule);
-        if (iMedia)  CSS_Text = [
+
+        return  $('<style />', {
+            type:       'text/css',
+            'class':    'jQuery_CSS-Rule',
+            text:       (! iMedia) ? CSS_Text : [
                 '@media ' + iMedia + ' {',
                 CSS_Text.replace(/\n/m, "\n    "),
                 '}'
-            ].join("\n");
-
-        var $_Style = $('<style />', {
-                type:       'text/css',
-                'class':    'jQuery_CSS-Rule'
-            });
-
-        return  $_Style.html(CSS_Text).appendTo(DOM.head)[0].sheet;
+            ].join("\n")
+        }).appendTo(DOM.head)[0].sheet;
     };
 
     $.fn.cssRule = function (iRule, iCallback) {
@@ -2402,16 +2410,15 @@
 
     /* ----- Smart HTML Loading ----- */
     $.fn.load = function (iURL, iData, iCallback) {
+        if (! this.length)  return this;
+
         var $_This = this;
 
-        iURL = iURL.trim().split(/\s+/);
-        iURL[1] = iURL.slice(1).join(' ');
-        iURL.length = 2;
+        iURL = $.split(iURL.trim(), /\s+/, 2, ' ');
         if (typeof iData == 'function') {
             iCallback = iData;
             iData = null;
         }
-
         function Append_Back() {
             $_This.children().fadeOut();
             $(arguments[0]).appendTo( $_This.empty() ).fadeIn();
@@ -2420,7 +2427,6 @@
                 for (var i = 0;  i < $_This.length;  i++)
                     iCallback.apply($_This[i], arguments);
         }
-
         function Load_Back(iHTML) {
             if (typeof iHTML != 'string')  return;
 
@@ -2439,7 +2445,6 @@
                 $(this).remove();
             });
         }
-
         if (! iData)
             $.get(iURL[0], Load_Back);
         else
@@ -2494,7 +2499,8 @@
 /* ---------- HTML 5 Form Shim ---------- */
 (function ($) {
 
-    if (! $.browser.ios)  return;
+    if (! (($.browser.msie < 10)  ||  $.browser.ios))
+        return;
 
     function Value_Check() {
         var $_This = $(this);
