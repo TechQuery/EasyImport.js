@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-10-7)  Stable
+//      [Version]    v1.0  (2015-10-8)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -12,7 +12,7 @@
 //
 
 
-/* ---------- ECMAScript 5/6  Patch ---------- */
+/* ---------- ECMAScript API  Patch & Extension ---------- */
 (function (BOM) {
 
     if (! console) {
@@ -32,28 +32,21 @@
         };
     }
 
-    BOM.iRegExp = function (iString, Mode, Special_Char) {
-        var iRegExp_Compiled = / /,
-            iChar = ['/', '.'];
+    if (! Object.getOwnPropertyNames)
+        Object.getOwnPropertyNames = function (iObject) {
+            var iKey = [ ];
 
-        if (Special_Char instanceof Array)
-            iChar = iChar.concat(Special_Char);
-        else if (Special_Char === null)
-            iChar.length = 0;
+            for (var _Key_ in iObject)
+                if ( this.prototype.hasOwnProperty.call(iObject, _Key_) )
+                    iKey.push(_Key_);
 
-        for (var i = 0; i < iChar.length; i++)
-            iString = iString.replace(
-                RegExp("([^\\\\])\\" + iChar[i], 'g'),  "$1\\" + iChar[i]
-            );
-        iRegExp_Compiled.compile(iString, Mode);
-
-        return iRegExp_Compiled;
-    };
+            return iKey;
+        };
 
     /* ----- String Extension ----- */
 
     if (! ''.trim)
-        var Blank_Char = BOM.iRegExp('(^\\s*)|(\\s*$)', 'g');
+        var Blank_Char = /(^\s*)|(\s*$)/g;
     else
         var _Trim_ = ''.trim;
 
@@ -302,9 +295,29 @@
                 for (var i = iArray.length - 1;  i > -1 ;  i--)
                     if (this.inArray(iArray, iArray[i]) == i)
                         iResult.push( iArray[i] );
-
                 iResult.reverse();
+
                 return iResult;
+            },
+            isEqual:          function (iLeft, iRight) {
+                if (! iLeft)
+                    return  (iLeft == iRight);
+
+                var Left_Key = Object.getOwnPropertyNames(iLeft),
+                    Right_Key = Object.getOwnPropertyNames(iRight);
+
+                if (Left_Key.length != Right_Key.length)  return false;
+
+                for (var i = 0, _Key_;  i < Left_Key;  i++) {
+                    _Key_ = Left_Key[i];
+
+                    if (! (
+                        (_Key_ in iRight)  &&
+                        arguments.callee.call(this, iLeft[_Key_], iRight[_Key_])
+                    ))
+                        return false;
+                }
+                return true;
             }
         };
     function _inKey_() {
@@ -841,8 +854,8 @@
     });
 
     for (var _Pseudo_ in iPseudo)
-        iPseudo[_Pseudo_].regexp = BOM.iRegExp(
-            '(.*?)' + _Pseudo_ + "([>\\+~\\s]*.*)",  undefined,  null
+        iPseudo[_Pseudo_].regexp = RegExp(
+            '(.*?)' + _Pseudo_ + "([>\\+~\\s]*.*)"
         );
 
     function DOM_Search(iRoot, iSelector) {
@@ -872,9 +885,8 @@
             }
         });
     }
-
-
 /* ---------- jQuery API ---------- */
+
     BOM.iQuery = function (Element_Set, iContext) {
         /* ----- Global Wrapper ----- */
         var _Self_ = arguments.callee;
@@ -1264,7 +1276,7 @@
                 $_Result = Array_Concat(
                     $_Result,  Object_Seek.call(this[i], 'previousElementSibling')
                 );
-            $_Result = $.unique($_Result);
+            $_Result = $.unique($_Result).reverse();
 
             if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
 
@@ -3045,11 +3057,11 @@
 
     /* ----- Page URL of a DOM ----- */
     $.fn.pagePath = function () {
-        var _PP = this[0].baseURI || this[0].ownerDocument.URL;
-        _PP = _PP.split('/');
-        if (_PP.length > 3) _PP.pop();
-        _PP.push('');
-        return _PP.join('/');
+        var iURL = (this[0].baseURI || this[0].ownerDocument.URL).split('/');
+
+        if (iURL.length > 3)  iURL.splice(-1, 1, '');
+
+        return iURL.join('/');
     };
 
 })(self, self.document, self.iQuery);
