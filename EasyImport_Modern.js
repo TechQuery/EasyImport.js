@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-10-8)  Stable
+//      [Version]    v1.0  (2015-10-15)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -89,7 +89,7 @@
         });
     };
 
-    /* ----- New Window Fix  v0.3 ----- */
+    /* ----- BOM/DOM Fix  v0.3 ----- */
 
     BOM.new_Window_Fix = function (Fix_More) {
         if (! this)  return false;
@@ -173,14 +173,14 @@
                             if (iEvery.call(Arr_Obj[i], i, Arr_Obj[i]) === false)
                                 break;
                         } catch (iError) {
-                            console.log(iError);
+                            console.dir( iError.valueOf() );
                         }
                     else
                         for (var iKey in Arr_Obj)  try {
                             if (iEvery.call(Arr_Obj[iKey], iKey, Arr_Obj[iKey]) === false)
                                 break;
                         } catch (iError) {
-                            console.log(iError);
+                            console.dir( iError.valueOf() );
                         }
                 return Arr_Obj;
             },
@@ -252,15 +252,24 @@
                 return iResult;
             },
             isEqual:          function (iLeft, iRight) {
-                if (! iLeft)
+                if (!  (iLeft && iRight))
                     return  (iLeft == iRight);
+
+                iLeft = iLeft.valueOf();
+                iRight = iRight.valueOf();
+
+                if (iLeft == iRight)  return true;
+                if (! (
+                    (iLeft instanceof Object)  &&  (iRight instanceof Object)
+                ))
+                    return false;
 
                 var Left_Key = Object.getOwnPropertyNames(iLeft),
                     Right_Key = Object.getOwnPropertyNames(iRight);
 
                 if (Left_Key.length != Right_Key.length)  return false;
 
-                for (var i = 0, _Key_;  i < Left_Key;  i++) {
+                for (var i = 0, _Key_;  i < Left_Key.length;  i++) {
                     _Key_ = Left_Key[i];
 
                     if (! (
@@ -414,8 +423,10 @@
     /* ----- DOM Attribute ----- */
     _DOM_.Attribute = {
         get:      function (iElement, iName) {
-            return  (_Object_.type(iElement) in Type_Info.DOM.root) ?
-                    null : iElement.getAttribute(iName);
+            if (! (_Object_.type(iElement) in Type_Info.DOM.root)) {
+                var iValue = iElement.getAttribute(iName);
+                return  (iValue === null) ? undefined : iValue;
+            }
         },
         set:      function (iElement, iName, iValue) {
             return  (_Object_.type(iElement) in Type_Info.DOM.root) ?
@@ -440,7 +451,7 @@
     _DOM_.Style = {
         get:           function (iElement, iName) {
             if ((! iElement) || (_Object_.type(iElement) in Type_Info.DOM.root))
-                return null;
+                return;
 
             var iStyle = DOM.defaultView.getComputedStyle(iElement, null).getPropertyValue(iName);
             var iNumber = parseFloat(iStyle);
@@ -647,20 +658,17 @@
 
         if ((iNew.length == 1)  &&  (iNew[0].nodeType == 1)  &&  AttrList)
             _Object_.each(AttrList,  function (iKey, iValue) {
-                try {
-                    switch (iKey) {
-                        case 'text':     _DOM_.innerText.set(iNew[0], iValue);  break;
-                        case 'html':     _DOM_.innerHTML.set(iNew[0], iValue);  break;
-                        case 'style':    if ( _Object_.isPlainObject(iValue) ) {
-                            _DOM_.operate('Style', iNew, iValue);
-                            break;
-                        }
-                        default:         _DOM_.operate('Attribute', iNew, iKey, iValue);
+                switch (iKey) {
+                    case 'text':     return  _DOM_.innerText.set(iNew[0], iValue);
+                    case 'html':     return  _DOM_.innerHTML.set(iNew[0], iValue);
+                    case 'style':    {
+                        if ( _Object_.isPlainObject(iValue) )
+                            return  _DOM_.operate('Style', iNew, iValue);
                     }
-                } catch (iError) {
-                    console.error(iError);
                 }
+                _DOM_.operate('Attribute', iNew, iKey, iValue);
             });
+
         if (iNew[0].parentNode)
             iNew = _Object_.map(iNew,  function (iDOM, _Index_) {
                 iNew[_Index_].parentNode.removeChild(iDOM);
@@ -889,11 +897,10 @@
                 throw 'Illegal XML Format...';
 
             var iXML = (new BOM.DOMParser()).parseFromString(iString, 'text/xml');
+
             var iError = iXML.getElementsByTagName('parsererror');
-            if (iError.length) {
-                throw  new SyntaxError(1, 'Incorrect XML Syntax !');
-                console.log(iError[0]);
-            }
+            if (iError.length)
+                throw  new SyntaxError(1, iError[0].childNodes[1].nodeValue);
             iXML.cookie;    //  for old WebKit core to throw Error
 
             return iXML;
@@ -1812,9 +1819,7 @@
 
 
     /* ----- History API ----- */
-    var _State_ = [
-            [null, DOM.title, DOM.URL]
-        ],
+    var _State_ = [[null, DOM.title, DOM.URL]],
         _Pushing_ = false,
         $_BOM = $(BOM);
 
@@ -3100,7 +3105,7 @@
     });
     /* ----- Remote Error Log  v0.2 ----- */
 
-    //  Thank for raphealguo --- http://rapheal.sinaapp.com/2014/11/06/javascript-error-monitor/
+    //  Thanks "raphealguo" --- http://rapheal.sinaapp.com/2014/11/06/javascript-error-monitor/
 
     var Console_URL = $('head link[rel="console"]').attr('href');
 
