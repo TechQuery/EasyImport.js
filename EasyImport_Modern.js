@@ -1037,22 +1037,18 @@
             return  $.each(this, arguments[0]);
         },
         is:                 function (iSelector) {
-            return  (
-                    $.inArray(
-                        $(iSelector,  this[0] && this[0].parentNode),
-                        this[0]
-                    ) > -1
-                );
+            if (! this[0])  return;
+
+            if (! this[0].parentNode)  $('<div />')[0].appendChild( this[0] );
+
+            return  ($.inArray($(iSelector, this[0].parentNode),  this[0])  >  -1);
         },
         filter:             function (iSelector) {
-            var $_Filter = $(iSelector),
-                $_Result = [ ];
+            var $_Result = [ ];
 
-            if ( $_Filter.length ) {
-                for (var i = 0;  i < this.length;  i++)
-                    if ($.inArray($_Filter, this[i]) > -1)
-                        $_Result.push( this[i] );
-            }
+            for (var i = 0;  i < this.length;  i++)
+                if ( $(this[i]).is(iSelector) )
+                    $_Result.push( this[i] );
 
             return this.pushStack($_Result);
         },
@@ -2464,7 +2460,6 @@
 
         $_Form.on('submit',  function (iEvent) {
             iEvent.preventDefault();
-            iEvent.stopPropagation();
             $_Button.attr('disabled', true);
 
             var iMethod = ($(this).attr('method') || 'Get').toLowerCase();
@@ -2472,7 +2467,7 @@
             if ( this.checkValidity() )  switch (iMethod) {
                 case 'get':       ;
                 case 'delete':
-                    $[iMethod](this.action, AJAX_Ready);    break;
+                    $[iMethod](this.action + $.param(this),  AJAX_Ready);    break;
                 case 'post':      ;
                 case 'put':
                     $[iMethod](this.action, this, AJAX_Ready);
