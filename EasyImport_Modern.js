@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-10-20)  Stable
+//      [Version]    v1.0  (2015-11-12)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -2087,6 +2087,20 @@
         );
     }
 
+    function XD_Request(iData) {
+        this.withCredentials = true;
+
+        if (typeof iData == 'string')
+            this.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        if (! this.crossDomain) {
+            this.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            this.setRequestHeader('Accept', '*/*');
+        }
+        this.send(iData);
+
+        return this;
+    }
+
     var XHR_Extension = {
             timeOut:        function (iSecond, iCallback) {
                 var iXHR = this;
@@ -2136,12 +2150,7 @@
                 iXHR.open.apply(iXHR, this.requestArgs);
 
                 $.wait(Wait_Seconds, function () {
-                    iXHR.withCredentials = true;
-                    if (typeof iData == 'string')
-                        iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                    iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-                    iXHR.setRequestHeader('Accept', '*/*');
-                    iXHR.send(iData);
+                    XD_Request.call(iXHR, iData);
                 });
             }
         };
@@ -2331,14 +2340,7 @@
             ((! iData) && $_Form)  ?  $_Form  :  iURL,
             true
         );
-        iXHR.withCredentials = true;
-        if (typeof iData == 'string')
-            iXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        iXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        iXHR.setRequestHeader('Accept', '*/*');
-        iXHR.send(iData);
-
-        return iXHR;
+        return  XD_Request.call(iXHR, iData);
     }
 
     function Idempotent_Args(iURL) {
@@ -2460,14 +2462,15 @@
 
         $_Form.on('submit',  function (iEvent) {
             iEvent.preventDefault();
+            iEvent.stopPropagation();
             $_Button.attr('disabled', true);
 
-            var iMethod = ($(this).attr('method') || 'Get').toLowerCase();
+            var iMethod = ($_Form.attr('method') || 'Get').toLowerCase();
 
             if ( this.checkValidity() )  switch (iMethod) {
                 case 'get':       ;
                 case 'delete':
-                    $[iMethod](this.action + $.param(this),  AJAX_Ready);    break;
+                    $[iMethod](this.action + $.param($_Form.serializeArray()),  AJAX_Ready);    break;
                 case 'post':      ;
                 case 'put':
                     $[iMethod](this.action, this, AJAX_Ready);
