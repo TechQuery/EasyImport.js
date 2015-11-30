@@ -225,7 +225,7 @@
                 return  Array.apply(null, arguments[0]);
             },
             inArray:          function () {
-                return  Array.prototype.indexOf.call(arguments[0], arguments[1]);
+                return  Array.prototype.indexOf.call(arguments[1], arguments[0]);
             },
             unique:           function (iArray) {
                 var iResult = [ ];
@@ -298,12 +298,17 @@
     _Object_.type = function (iVar) {
         var iType = typeof iVar;
 
-        iType = (iType == 'object') ? (
-                (iVar && iVar.constructor.name) ||
-                Object.prototype.toString.call(iVar).match(/\[object\s+([^\]]+)\]/i)[1]
-            ) : (
-                iType[0].toUpperCase() + iType.slice(1)
-            );
+        try {
+            iType = (iType == 'object') ? (
+                    (iVar && iVar.constructor.name) ||
+                    Object.prototype.toString.call(iVar).match(/\[object\s+([^\]]+)\]/i)[1]
+                ) : (
+                    iType[0].toUpperCase() + iType.slice(1)
+                );
+        } catch (iError) {
+            if (iError instanceof DOMException)
+                return 'Window';
+        }
 
         if (! iVar)  switch (true) {
             case (isNaN(iVar)  &&  (iVar !== iVar)):    return 'NaN';
@@ -311,16 +316,11 @@
             default:                                    return iType;
         }
 
-        try {
-            if (
-                Type_Info.BOM[iType] ||
-                ((iVar == iVar.document) && (iVar.document != iVar))
-            )
-                return 'Window';
-        } catch (iError) {
-            if (iError instanceof DOMException)
-                return 'Window';
-        }
+        if (
+            Type_Info.BOM[iType] ||
+            ((iVar == iVar.document) && (iVar.document != iVar))
+        )
+            return 'Window';
 
         if (iVar.defaultView || iVar.documentElement)
             return 'Document';
@@ -1029,13 +1029,13 @@
             var iType = $.type(iTarget);
             switch (true) {
                 case (iType == 'String'):
-                    return  $.inArray($(iTarget), this[0]);
+                    return  $.inArray(this[0], $(iTarget));
                 case (iType in Type_Info.DOM.set):    {
                     iTarget = iTarget[0];
                     iType = $.type(iTarget);
                 }
                 case (iType in Type_Info.DOM.element):
-                    return  $.inArray(this, iTarget);
+                    return  $.inArray(iTarget, this);
             }
             return -1;
         },
@@ -1051,7 +1051,7 @@
 
             if (! this[0].parentNode)  $('<div />')[0].appendChild( this[0] );
 
-            return  ($.inArray($(iSelector, this[0].parentNode),  this[0])  >  -1);
+            return  ($.inArray(this[0],  $(iSelector, this[0].parentNode))  >  -1);
         },
         filter:             function (iSelector) {
             var $_Result = [ ];
@@ -1067,7 +1067,7 @@
                 $_Result = [ ];
 
             for (var i = 0;  i < this.length;  i++)
-                if ($.inArray($_Not, this[i]) < 0)
+                if ($.inArray(this[i], $_Not) < 0)
                     $_Result.push(this[i]);
 
             return this.pushStack($_Result);
@@ -1104,7 +1104,7 @@
             var $_Result = [ ];
 
             for (var i = 0;  i < this.length;  i++)
-                if ($.inArray($_Result, this[i].parentNode) == -1)
+                if ($.inArray(this[i].parentNode, $_Result) == -1)
                     $_Result.push( this[i].parentNode );
 
             if (arguments[0])  $_Result = $($_Result).filter(arguments[0]);
@@ -1303,7 +1303,7 @@
                 old_Class = (old_Class || '').trim().split(/\s+/);
 
                 for (var i = 0;  i < new_Class.length;  i++)
-                    if ($.inArray(old_Class, new_Class[i]) == -1)
+                    if ($.inArray(new_Class[i], old_Class) == -1)
                         old_Class.push( new_Class[i] );
 
                 return  old_Class.join(' ').trim();
@@ -1321,7 +1321,7 @@
                 var new_Class = [ ];
 
                 for (var i = 0;  i < old_Class.length;  i++)
-                    if ($.inArray(iClass, old_Class[i]) == -1)
+                    if ($.inArray(old_Class[i], iClass) == -1)
                         new_Class.push( old_Class[i] );
 
                 return  new_Class.join(' ');
@@ -1395,7 +1395,7 @@
 
                         for (var i = 0, _Return_;  i < $_Patch.length;  i++) {
                             if ($_Patch[i] === this)  break;
-                            if ($.inArray($_Filter, $_Patch[i]) == -1)  continue;
+                            if ($.inArray($_Patch[i], $_Filter) == -1)  continue;
 
                             if (iArgs[1] === null)
                                 iArgs = [ iArgs[0] ].concat( $($_Patch[i]).data('_trigger_') );
@@ -1967,23 +1967,24 @@
                 $(iEvent.target).trigger((iTime > 300) ? 'press' : 'tap');
         }
     );
-    /* ----- Cross Page Message Event ----- */
+    /* ----- Cross Page Event ----- */
 
-    function CrossPageMessageEvent(iType, iSource) {
+    function CrossPageEvent(iType, iSource) {
         if (typeof iType == 'string') {
             this.type = iType;
             this.target = iSource;
         } else
             $.extend(this, iType);
 
-        $.extend(this, iSource.dataset);
+        if (iSource)  $.extend(this, iSource.dataset);
     }
 
-    CrossPageMessageEvent.prototype.valueOf = function () {
+    CrossPageEvent.prototype.valueOf = function () {
         var iValue = $.extend({ }, this);
 
         delete iValue.data;
         delete iValue.target;
+        delete iValue.valueOf;
 
         return iValue;
     };
@@ -2002,14 +2003,14 @@
             iCallback = arguments[3];
         }
 
-        var _Event_ = new CrossPageMessageEvent(iType, $_Source[0]);
+        var _Event_ = new CrossPageEvent(iType,  ($_Source || { })[0]);
 
         $_BOM.on('message',  function (iEvent) {
-            var iReturn = new CrossPageMessageEvent(iEvent.data);
+            var iReturn = new CrossPageEvent(iEvent.data);
 
             if (
                 (iEvent.source === iTarget)  &&
-                (iReturn.event == iType)  &&
+                (iReturn.type == iType)  &&
                 $.isEqual(iReturn, _Event_)
             ) {
                 iCallback.call($_Source ? $_Source[0] : this,  iReturn);
@@ -2018,7 +2019,7 @@
         });
 
         iTarget.postMessage(
-            $.extend({data: iData},  _Event_),  '*'
+            $.extend({data: iData},  _Event_.valueOf()),  '*'
         );
     };
 
@@ -3145,7 +3146,7 @@
             if (! iLazy)  return;
 
             for (var i = 0;  i < iLazy.length;  i++) {
-                if ($.inArray(Load_List, iLazy[i]) != -1)  continue;
+                if ($.inArray(iLazy[i], Load_List) != -1)  continue;
 
                 iLazy[i].src = iLazy[i].attributes['data-src'].nodeValue;
                 Load_List.push( iLazy[i] );
