@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-12-4)  Stable
+//      [Version]    v1.0  (2015-12-9)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -94,8 +94,7 @@
         } catch (iError) {
             return false;
         }
-        if (Fix_More)
-            Fix_More.call(this);
+        if (Fix_More)  Fix_More.call(this);
 
         return true;
     };
@@ -985,6 +984,21 @@
         };
     }
 
+    function DOM_Insert(iName) {
+        return  function () {
+            if (this.length) {
+                if (! this[0][iName])
+                    this.append.apply(
+                        (iName == 'firstElementChild')  ?  this  :  this.parent(),
+                        arguments
+                    );
+                else
+                    this.before.apply($(this[0][iName]), arguments);
+            }
+            return this;
+        };
+    }
+
     function Array_Concat(iSource) {
         if (! (iSource instanceof Array))
             iSource = $.makeArray(iSource);
@@ -1008,6 +1022,9 @@
                     var $_A = Object_Seek.call(A, 'parentNode').reverse(),
                         $_B = Object_Seek.call(B, 'parentNode').reverse();
 
+                    if ($_A.length != $_B.length)
+                        return  $_B.length - $_A.length;
+
                     for (var i = 0;  i < $_A.length;  i++)
                         if ($_A[i] !== $_B[i])
                             return (
@@ -1018,8 +1035,11 @@
             $_New.prevObject = this;
             return $_New;
         },
-        eq:                 function () {
-            return  this.pushStack( this[arguments[0]] );
+        slice:              function () {
+            return  this.pushStack( [ ].slice.apply(this, arguments) );
+        },
+        eq:                 function (Index) {
+            return  this.pushStack( [ ].slice.call(this,  Index,  Index + 1) );
         },
         index:              function (iTarget) {
             if (! iTarget)
@@ -1037,9 +1057,6 @@
                     return  $.inArray(iTarget, this);
             }
             return -1;
-        },
-        slice:              function () {
-            return  this.pushStack( [ ].slice.apply(this, arguments) );
         },
         each:               function () {
             return  $.each(this, arguments[0]);
@@ -1110,9 +1127,9 @@
 
             $_Result = $( $.unique($_Result) );
 
-            return this.pushStack(Array.prototype.reverse.call(
+            return this.pushStack(
                 arguments[0]  ?  $_Result.filter(arguments[0])  :  $_Result
-            ));
+            );
         },
         sameParents:        function () {
             if (this.length < 2)  return this.parents();
@@ -1509,20 +1526,13 @@
                     this.parentNode.insertBefore(_Cache_, this);
                 });
         },
-        prepend:            function () {
-            if (this.length) {
-                if (! this[0].children.length)
-                    this.append.apply(this, arguments);
-                else
-                    this.before.apply($(this[0].children[0]), arguments);
-            }
-            return this;
-        },
+        prepend:            DOM_Insert('firstElementChild'),
         prependTo:          function () {
             $(arguments[0], arguments[1]).prepend(this);
 
             return  this;
         },
+        after:              DOM_Insert('nextElementSibling'),
         val:                function () {
             if (! $.isData(arguments[0]))
                 return  this[0] && this[0].value;
@@ -1554,18 +1564,18 @@
     $.fn.off = $.fn.unbind;
 
     function Event_Method(iName) {
-        return  function () {
-                if (! arguments[0]) {
-                    for (var i = 0;  i < this.length;  i++)  try {
-                        this[i][iName]();
-                    } catch (iError) {
-                        $(this[i]).trigger(iName);
-                    }
-                } else
-                    this.bind(iName, arguments[0]);
+        return  function (iCallback) {
+            if ((typeof iCallback == 'function')  ||  (iCallback === false))
+                return  this.bind(iName, arguments[0]);
 
-                return this;
-            };
+            for (var i = 0;  i < this.length;  i++)  try {
+                this[i][iName]();
+            } catch (iError) {
+                $(this[i]).trigger(iName);
+            }
+
+            return this;
+        };
     }
 
     for (var iName in _inKey_(
@@ -2483,54 +2493,41 @@
 /* ---------- W3C HTML 5  Shim ---------- */
 (function (BOM, DOM, $) {
 
-    if (! (($.browser.msie < 10)  ||  $.browser.ios))
-        return;
+    if (! ($.browser.msie < 11))  return;
 
 
-    /* ----- Form API ----- */
+    /* ----- Element Data Set ----- */
 
-    function Value_Check() {
-        var $_This = $(this);
-
-        if ((typeof $_This.attr('required') == 'string')  &&  (! this.value))
-            return false;
-
-        var iRegEx = $_This.attr('pattern');
-        if (iRegEx)  try {
-            return  RegExp(iRegEx).test(this.value);
-        } catch (iError) { }
-
-        if ((this.tagName.toLowerCase() == 'input')  &&  (this.type == 'number')) {
-            var iNumber = Number(this.value),
-                iMin = Number( $_This.attr('min') );
-            if (
-                isNaN(iNumber)  ||
-                (iNumber < iMin)  ||
-                (iNumber > Number( $_This.attr('max') ))  ||
-                ((iNumber - iMin)  %  Number( $_This.attr('step') ))
-            )
-                return false;
+    function DOMStringMap(iElement) {
+        for (var i = 0, iAttr;  i < iElement.attributes.length;  i++) {
+            iAttr = iElement.attributes[i];
+            if (iAttr.nodeName.slice(0, 5) == 'data-')
+                this[ iAttr.nodeName.toCamelCase() ] = iAttr.nodeValue;
         }
-
-        return true;
     }
 
-    HTMLInputElement.prototype.checkValidity = Value_Check;
-    HTMLSelectElement.prototype.checkValidity = Value_Check;
-    HTMLTextAreaElement.prototype.checkValidity = Value_Check;
-
-    HTMLFormElement.prototype.checkValidity = function () {
-        var $_Input = $('*[name]:input', this);
-
-        for (var i = 0;  i < $_Input.length;  i++)
-            if (! $_Input[i].checkValidity())
-                return false;
-        return true;
-    };
+    Object.defineProperty(Element.prototype, 'dataset', {
+        get:    function () {
+            return  new DOMStringMap(this);
+        },
+        set:    function () { }
+    });
 
 
     if (! ($.browser.msie < 10))  return;
 
+    /* ----- Error Useful Information ----- */
+
+    //  Thanks "Kevin Yang" ---
+    //
+    //      http://www.imkevinyang.com/2010/01/%E8%A7%A3%E6%9E%90ie%E4%B8%AD%E7%9A%84javascript-error%E5%AF%B9%E8%B1%A1.html
+
+    Error.prototype.valueOf = function () {
+        return  $.extend(this, {
+            code:       this.number & 0x0FFFF,
+            helpURL:    'https://msdn.microsoft.com/en-us/library/1dk3k160(VS.85).aspx'
+        });
+    };
 
     /* ----- History API ----- */
 
@@ -2573,6 +2570,56 @@
             state:    iState[0]
         });
     });
+
+})(self, self.document, self.jQuery);
+
+
+
+(function (BOM, DOM, $) {
+
+    if (! (($.browser.msie < 10)  ||  $.browser.ios))
+        return;
+
+    /* ----- Form API ----- */
+
+    function Value_Check() {
+        var $_This = $(this);
+
+        if ((typeof $_This.attr('required') == 'string')  &&  (! this.value))
+            return false;
+
+        var iRegEx = $_This.attr('pattern');
+        if (iRegEx)  try {
+            return  RegExp(iRegEx).test(this.value);
+        } catch (iError) { }
+
+        if ((this.tagName.toLowerCase() == 'input')  &&  (this.type == 'number')) {
+            var iNumber = Number(this.value),
+                iMin = Number( $_This.attr('min') );
+            if (
+                isNaN(iNumber)  ||
+                (iNumber < iMin)  ||
+                (iNumber > Number( $_This.attr('max') ))  ||
+                ((iNumber - iMin)  %  Number( $_This.attr('step') ))
+            )
+                return false;
+        }
+
+        return true;
+    }
+
+    HTMLInputElement.prototype.checkValidity = Value_Check;
+    HTMLSelectElement.prototype.checkValidity = Value_Check;
+    HTMLTextAreaElement.prototype.checkValidity = Value_Check;
+
+    HTMLFormElement.prototype.checkValidity = function () {
+        var $_Input = $('*[name]:input', this);
+
+        for (var i = 0;  i < $_Input.length;  i++)
+            if (! $_Input[i].checkValidity())
+                return false;
+        return true;
+    };
 
 })(self, self.document, self.iQuery);
 
