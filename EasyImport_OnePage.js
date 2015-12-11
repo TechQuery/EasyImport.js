@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-12-9)  Stable
+//      [Version]    v1.0  (2015-12-11)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -273,10 +273,11 @@
 
                 return iTarget;
             },
-            likeArray:        function () {
+            likeArray:        function (iObject) {
                 return (
-                    (typeof arguments[0].length == 'number')  &&
-                    (typeof arguments[0].valueOf() != 'string')
+                    iObject  &&
+                    (typeof iObject.length == 'number')  &&
+                    (typeof iObject.valueOf() != 'string')
                 );
             },
             makeArray:        _Browser_.modern ?
@@ -684,9 +685,10 @@
         var iHandler = (_DOM_.operate('Data', [this], '_event_') || { })[iEvent.type];
         if (! iHandler)  return;
 
-        var This_DOM = this,
-            Handler_Args = [iEvent].concat( _DOM_.operate('Data', [this], '_trigger_') ),
-            iReturn;
+        var Handler_Args = [iEvent].concat(
+                _DOM_.operate('Data', [iEvent.target], '_trigger_')
+            ),
+            This_DOM = this,  iReturn;
 
         _Object_.each(iHandler,  function () {
             var This_Handler = arguments[1],  _Return_;
@@ -871,7 +873,7 @@
     }
 /* ---------- jQuery API ---------- */
 
-    BOM.iQuery = function (Element_Set, iContext) {
+    function iQuery(Element_Set, iContext) {
         /* ----- Global Wrapper ----- */
         var _Self_ = arguments.callee;
 
@@ -896,9 +898,9 @@
                 );
         }
         this.add( Element_Set );
-    };
+    }
 
-    var $ = BOM.iQuery;
+    var $ = BOM.iQuery = iQuery;
     $.fn = $.prototype;
 
     $.fn.add = function (Element_Set) {
@@ -924,12 +926,12 @@
         return this;
     };
 
-    if (typeof BOM.jQuery != 'function') {
-        BOM.jQuery = BOM.iQuery;
-        BOM.$ = $;
-    }
+    if (typeof BOM.jQuery != 'function')
+        BOM.jQuery = BOM.$ = $;
+
 
     /* ----- iQuery Static Method ----- */
+
     _Object_.extend($, _Object_, _Time_, {
         browser:          _Browser_,
         isData:           function () {
@@ -1136,13 +1138,26 @@
                             );
                 });
             $_New.prevObject = this;
+
+            return $_New;
+        },
+        refresh:            function () {
+            if (! this.selector)  return this;
+
+            var $_New = $(this.selector, this.context);
+
+            if (this.prevObject instanceof $)
+                $_New = this.prevObject.pushStack($_New);
+
             return $_New;
         },
         slice:              function () {
             return  this.pushStack( [ ].slice.apply(this, arguments) );
         },
         eq:                 function (Index) {
-            return  this.pushStack( [ ].slice.call(this,  Index,  Index + 1) );
+            return  this.pushStack(
+                [ ].slice.call(this,  Index,  (Index + 1) || undefined)
+            );
         },
         index:              function (iTarget) {
             if (! iTarget)
