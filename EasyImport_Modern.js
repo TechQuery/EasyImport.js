@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2015-12-15)  Stable
+//      [Version]    v1.0  (2015-12-16)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -1596,7 +1596,7 @@
     for (var iName in _inKey_(
         'abort', 'error',
         'keydown', 'keypress', 'keyup',
-        'mousedown', 'mouseup', 'mousemove',
+        'mousedown', 'mouseup', 'mousemove', 'mousewheel',
         'click', 'dblclick', 'scroll',
         'select', 'focus', 'blur', 'change', 'submit', 'reset',
         'tap', 'press', 'swipe'
@@ -1645,7 +1645,7 @@
                     return;
                 }
                 iURL = $_This.css('background-image').match(/^url\(('|")?([^'"]+)('|")?\)/);
-                return  (End_Element && $_This.text())  ||  (iURL && iURL[2]);
+                return  End_Element  ?  $_This.text()  :  (iURL && iURL[2]);
             }
         }
     }
@@ -1912,20 +1912,32 @@
             var iShift = Math.sqrt(
                     Math.pow(swipeLeft, 2)  +  Math.pow(swipeTop, 2)
                 );
-            if (iShift > 20)
-                $(iEvent.target).trigger('swipe', [
-                    swipeLeft,  swipeTop,  iShift
-                ]);
-            else
-                $(iEvent.target).trigger((iTime > 300) ? 'press' : 'tap');
+            $(iEvent.target).trigger((iShift < 22)  ?
+                ((iTime > 300) ? 'press' : 'tap')  :  {
+                    type:      'swipe',
+                    pageX:     swipeLeft,
+                    pageY:     swipeTop,
+                    detail:    iShift
+                }
+            );
         }
     );
-
     /* ----- Text Input Event ----- */
 
+    function TypeBack(iHandler, iEvent, iKey) {
+        var iValue = this[iKey];
+
+        var iReturn = iHandler.call(iEvent.target, iEvent, iValue);
+
+        if (iReturn !== false)
+            $(this).data('_Last_Value_', iValue);
+        else
+            this[iKey] = $(this).data('_Last_Value_');
+    }
+
     $.fn.input = function (iHandler) {
-        this.filter('input, textarea').on('input',  function (iEvent) {
-            iHandler.call(this, iEvent, this.value);
+        this.filter('input, textarea').on('input',  function () {
+            TypeBack.call(this, iHandler, arguments[0], 'value');
         });
 
         this.not('input, textarea').on('paste',  function (iEvent) {
@@ -1948,7 +1960,7 @@
             if (iEvent.ctrlKey || iEvent.shiftKey || iEvent.altKey)
                 return;
 
-            iHandler.call(iEvent.target, iEvent, iEvent.target.innerText);
+            TypeBack.call(iEvent.target, iHandler, iEvent, 'innerText');
         });
 
         return this;
@@ -2009,6 +2021,17 @@
             $.extend({data: iData},  _Event_.valueOf()),  '*'
         );
     };
+
+    /* ----- Mouse Wheel Event ----- */
+
+    if (! $.browser.ff)  return;
+
+    $_DOM.on('DOMMouseScroll',  function (iEvent) {
+        $(iEvent.target).trigger({
+            type:          'mousewheel',
+            wheelDelta:    -iEvent.detail * 40
+        });
+    });
 
 })(self, self.document, self.iQuery);
 
