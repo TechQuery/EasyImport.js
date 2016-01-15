@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2016-01-13)  Stable
+//      [Version]    v1.0  (2016-01-14)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -742,7 +742,7 @@
                     if ((! i)  ||  (
                         $_Temp[i].valueOf() != $_Temp[i - 1].valueOf()
                     ) || (
-                        $_Temp[i].DOM.innerHTML  !=  $_Temp[i - 1].DOM.innerHTML
+                        $_Temp[i].DOM.outerHTML  !=  $_Temp[i - 1].DOM.outerHTML
                     ))
                         $_Result[j++] = $_Temp[i].DOM;
 
@@ -927,8 +927,9 @@
                     .split('/').slice(0, -1).join('/');
         },
         urlDomain:        function () {
-            return  (arguments[0] || BOM.location.href)
-                    .split('/').slice(0, 3).join('/');
+            return (
+                (arguments[0] || BOM.location.href).match(/^(\w+:)?\/\/[^\/]+/)  ||  [ ]
+            )[0];
         },
         data:             function (iElement, iName, iValue) {
             return  _DOM_.operate('Data', [iElement], iName, iValue);
@@ -960,18 +961,27 @@
 
         return  function () {
             switch ( $.type(this[0]) ) {
-                case 'Document':    return  Math.max(
+                    return  Math.max(
                         this[0].documentElement[iName.scroll],
                         this[0].body[iName.scroll]
-                    );  break;
-                case 'Window':      return  this[0][iName.inner] || Math.max(
+                    );
+                case 'Window':
+                    return  this[0][iName.inner] || Math.max(
                         this[0].document.documentElement[iName.client],
                         this[0].document.body[iName.client]
-                    );  break;
-                default:            return  this.css(iName.css, arguments[0]);
+                    );
             }
+            var iValue = parseFloat(arguments[0]),
+                iFix = this.is('table') ? 4 : 0;
+
+            if (isNaN( iValue ))  return  this[0][iName.client] + iFix;
+
+            for (var i = 0;  i < this.length;  i++)
+                this[i][iName.client] = iValue - iFix;
+            return this;
         };
     }
+
     function Scroll_DOM() {
         return (
             ($.browser.webkit || (
@@ -1328,6 +1338,19 @@
         },
         width:              DOM_Size('Width'),
         height:             DOM_Size('Height'),
+        scrollParents:      function () {
+            return  Array_Reverse.call(this.pushStack(
+                $.map(this.parents(),  function () {
+                    var $_This = $(arguments[0]);
+
+                    if (
+                        ($_This.height() < $_This[0].scrollHeight)  ||
+                        ($_This.width() < $_This[0].scrollWidth)
+                    )
+                        return $_This[0];
+                })
+            ));
+        },
         scrollTop:          DOM_Scroll('Top'),
         scrollLeft:         DOM_Scroll('Left'),
         position:           function () {
@@ -2067,8 +2090,9 @@
     );
     /* ----- Text Input Event ----- */
 
-    function TypeBack(iHandler, iEvent, iKey) {
-        var iValue = this[iKey]();
+    function TypeBack(iHandler, iKey, iEvent) {
+        var $_This = $(this);
+        var iValue = $_This[iKey]();
 
         if (false  !==  iHandler.call(iEvent.target, iEvent, iValue))
             return;
@@ -2077,13 +2101,13 @@
         iValue.splice(
             BOM.getSelection().getRangeAt(0).startOffset - 1,  1
         );
-        this[iKey]( iValue.join('') );
+        $_This[iKey]( iValue.join('') );
     }
 
     $.fn.input = function (iHandler) {
-        this.filter('input, textarea').on('input',  function () {
-            TypeBack.call($(this), iHandler, arguments[0], 'val');
-        });
+        this.filter('input, textarea').on(
+            'input',  $.proxy(TypeBack, null, iHandler, 'val')
+        );
 
         this.not('input, textarea').on('paste',  function (iEvent) {
 
@@ -2103,7 +2127,7 @@
             )
                 return;
 
-            TypeBack.call($(iEvent.target), iHandler, iEvent, 'text');
+            TypeBack.call(iEvent.target, iHandler, 'text', iEvent);
         });
 
         return this;
@@ -2195,7 +2219,7 @@
 /* ---------- DOM/CSS Animation ---------- */
 (function ($) {
 
-    var FPS = 20;
+    var FPS = 60;
 
     function KeyFrame(iStart, iEnd, During_Second) {
         During_Second = Number(During_Second) || 1;
@@ -2313,11 +2337,13 @@
 
     /* ----- XML HTTP Request ----- */
     function X_Domain() {
-        var iPort = BOM.location.port  ?  (':' + BOM.location.port)  :  '';
+        var iDomain = $.urlDomain( arguments[0] );
 
-        return (
-            $.urlDomain( arguments[0] )  !=  [
-                BOM.location.protocol, '//', DOM.domain, iPort
+        return  iDomain && (
+            iDomain != [
+                BOM.location.protocol, '//', DOM.domain, (
+                    BOM.location.port  ?  (':' + BOM.location.port)  :  ''
+                )
             ].join('')
         );
     }
@@ -2698,7 +2724,7 @@
 
         function AJAX_Ready() {
             $_Button.prop('disabled', false);
-            iCallback.call($_Form[0], arguments[0]);
+            iCallback.apply($_Form[0], arguments);
         }
 
         $_Form.on('submit',  function (iEvent) {
