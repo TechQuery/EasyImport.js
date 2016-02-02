@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2016-01-29)  Stable
+//      [Version]    v1.0  (2016-02-02)  Stable
 //
 //                   (Modern & Mobile Edition)
 //
@@ -743,7 +743,7 @@
                 _Selector_[1] += (_Selector_[1].match(/[\s>\+~]\s*$/) ? '*' : '');
 
                 return _Object_.map(
-                    _Self_(iRoot, _Selector_[1]),
+                    iRoot.querySelectorAll(_Selector_[1]),
                     function (iDOM) {
                         if ( iPseudo[_Pseudo_].filter(iDOM) )
                             return  _Selector_[2]  ?
@@ -1336,25 +1336,6 @@
         css:                function () {
             return  _DOM_.operate('Style', this, arguments[0], arguments[1]);
         },
-        hide:               function () {
-            for (var i = 0, $_This;  i < this.length;  i++) {
-                $_This = $(this[i]);
-                $_This.data('display', $_This.css('display'))
-                    .css('display', 'none');
-            }
-            return this;
-        },
-        show:               function () {
-            for (var i = 0, $_This;  i < this.length;  i++) {
-                $_This = $(this[i]);
-                $_This.css({
-                    display:       $_This.data('display') || 'origin',
-                    visibility:    'visible',
-                    opacity:       1
-                });
-            }
-            return this;
-        },
         width:              DOM_Size('Width'),
         height:             DOM_Size('Height'),
         scrollParents:      function () {
@@ -1570,8 +1551,8 @@
         return this;
     };
 
-
 /* ---------- Smart zIndex ---------- */
+
     function Get_zIndex() {
         var $_This = $(this);
 
@@ -1610,8 +1591,8 @@
             return  this.css('z-index',  parseInt(new_Index) || 'auto');
     };
 
-
 /* ---------- CSS Rule ---------- */
+
     function CSS_Rule2Text(iRule) {
         var Rule_Text = [''],  Rule_Block,  _Rule_Block_;
 
@@ -1652,7 +1633,63 @@
         }).appendTo(DOM.head)[0].sheet;
     };
 
+    function CSS_Rule_Search(iStyleSheet, iFilter) {
+        return  $.map(iStyleSheet || DOM.styleSheets,  function () {
+            var iRule = arguments[0].cssRules,  _Self_ = arguments.callee;
+            if (! iRule)  return;
+
+            return  $.map(iRule,  function (_Rule_) {
+                return  (_Rule_.cssRules ? _Self_ : iFilter)(_Rule_);
+            });
+        });
+    }
+
+    function CSSRuleList() {
+        $.extend(this, arguments[0]);
+        this.length = arguments[0].length;
+    }
+
+    if (typeof BOM.getMatchedCSSRules != 'function')
+        BOM.getMatchedCSSRules = function (iElement, iPseudo) {
+            if (! (iElement instanceof Element))  return null;
+
+            if (typeof iPseudo == 'string') {
+                iPseudo = (iPseudo.match(/^\s*:{1,2}([\w\-]+)\s*$/) || [ ])[1];
+
+                if (! iPseudo)  return null;
+            } else if (iPseudo)
+                iPseudo = null;
+
+            return  new CSSRuleList(CSS_Rule_Search(null,  function (iRule) {
+                var iSelector = iRule.selectorText;
+
+                if (iPseudo) {
+                    iSelector = iSelector.replace(/:{1,2}([\w\-]+)$/,  function () {
+                        return  (arguments[1] == iPseudo)  ?  ''  :  arguments[0];
+                    });
+                    if (iSelector == iRule.selectorText)  return;
+                }
+                if (iElement.matches( iSelector ))  return iRule;
+            }));
+        };
+
     $.fn.cssRule = function (iRule, iCallback) {
+        if (! $.isPlainObject(iRule)) {
+            var $_This = this;
+
+            return  ($_This[0]  &&  CSS_Rule_Search(null,  function (_Rule_) {
+                if ((
+                    (typeof $_This.selector != 'string')  ||
+                    ($_This.selector != _Rule_.selectorText)
+                ) &&
+                    (! $_This[0].matches(_Rule_.selectorText))
+                )
+                    return;
+
+                if ((! iRule)  ||  (iRule && _Rule_.style[iRule]))
+                    return _Rule_;
+            }));
+        }
         return  this.each(function () {
             var $_This = $(this);
 
@@ -1666,33 +1703,6 @@
 
             if (typeof iCallback == 'function')  iCallback.call(this, iSheet);
         });
-    };
-
-    var Pseudo_RE = /:{1,2}[\w\-]+/g;
-
-    $.cssPseudo = function () {
-        var Pseudo_Rule = [ ];
-
-        $.each(arguments[0] || DOM.styleSheets,  function () {
-            var iRule = this.cssRules;
-            if (! iRule)  return;
-
-            for (var i = 0, iPseudo;  i < iRule.length;  i++)
-                if (! iRule[i].cssRules) {
-                    iPseudo = iRule[i].cssText.match(Pseudo_RE);
-                    if (! iPseudo)  continue;
-
-                    for (var j = 0;  j < iPseudo.length;  j++)
-                        iPseudo[j] = iPseudo[j].split(':').slice(-1)[0];
-                    iRule[i].pseudo = iPseudo;
-                    iRule[i].selectorText = iRule[i].selectorText ||
-                        iRule[i].cssText.match(/^(.+?)\s*\{/)[1];
-                    Pseudo_Rule.push(iRule[i]);
-                } else
-                    arguments.callee.call(iRule[i], i, iRule[i]);
-        });
-
-        return Pseudo_Rule;
     };
 
 /* ---------- Selection  Getter & Setter ---------- */
@@ -2313,7 +2323,89 @@
 
 
 /* ---------- DOM/CSS Animation ---------- */
-(function (DOM, $) {
+(function (BOM, DOM, $) {
+
+    var Pseudo_Class = $.makeSet([
+            ':link', 'visited', 'hover', 'active', 'focus', 'lang',
+            'enabled', 'disabled', 'checked',
+            'first-child', 'last-child', 'first-of-type', 'last-of-type',
+            'nth-child', 'nth-of-type', 'nth-last-child', 'nth-last-of-type',
+            'only-child', 'only-of-type', 'empty'
+        ].join(' :').split(' '));
+
+    function CSS_Selector_Priority(iSelector) {
+        var iPriority = [0, 0, 0];
+
+        if ( iSelector.match(/\#[^\s>\+~]+/) )  iPriority[0]++ ;
+
+        var iPseudo = (iSelector.match(/:[^\s>\+~]+/g)  ||  [ ]);
+        var pClass = $.map(iPseudo,  function () {
+                if (arguments[0] in Pseudo_Class)  return arguments[0];
+            });
+        iPriority[1] += (
+            iSelector.match(/\.[^\s>\+~]+/g)  ||  [ ]
+        ).concat(
+            iSelector.match(/\[[^\]]+\]/g)  ||  [ ]
+        ).concat(pClass).length;
+
+        iPriority[2] += ((
+            iSelector.match(/[^\#\.\[:]?[^\s>\+~]+/g)  ||  [ ]
+        ).length + (
+            iPseudo.length - pClass.length
+        ));
+
+        return iPriority;
+    }
+
+    function CSS_Rule_Sort(A, B) {
+        var pA = CSS_Selector_Priority(A.selectorText),
+            pB = CSS_Selector_Priority(B.selectorText);
+
+        for (var i = 0;  i < pA.length;  i++)
+            if (pA[i] == pB[i])  continue;
+            else
+                return  (pA[i] > pB[i])  ?  -1  :  1;
+        return 0;
+    }
+
+    function Last_Valid_CSS(iName) {
+        var iRule = [this[0]].concat(
+                this.cssRule( iName ).sort( CSS_Rule_Sort ),
+                {
+                    style:    BOM.getComputedStyle(
+                        $('<' + this[0].tagName.toLowerCase() + ' />')
+                            .appendTo('body')[0]
+                    )
+                }
+            );
+        for (var i = 0, iValue;  i < iRule.length;  i++) {
+            iValue = iRule[i].style[iName];
+
+            if (iValue && (iValue != 'none'))  return iValue;
+        }
+    }
+
+    $.fn.extend({
+        hide:               function () {
+            return  this.css('display',  function () {
+                $(this).data('_CSS_Display_', arguments[1]);
+                return 'none';
+            });
+        },
+        show:               function () {
+            for (var i = 0, $_This;  i < this.length;  i++) {
+                $_This = $(this[i]);
+
+                $_This.css({
+                    display:       $_This.data('_CSS_Display_') ||
+                        Last_Valid_CSS.call($_This, 'display'),
+                    visibility:    'visible',
+                    opacity:       1
+                });
+            }
+            return this;
+        }
+    });
 
     var FPS = 60;
 
@@ -2428,7 +2520,7 @@
         return  this.data('_animate_', 0).removeClass('animated');
     };
 
-})(self.document, self.iQuery);
+})(self, self.document, self.iQuery);
 
 
 
