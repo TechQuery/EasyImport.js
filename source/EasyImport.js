@@ -1,3 +1,18 @@
+
+//
+//                >>>  EasyImport.js  <<<
+//
+//
+//      [Version]    v1.2  (2016-05-16)  Stable
+//
+//      [Usage]      A Asynchronous & Responsive Loader
+//                   for Resource File in Web Browser.
+//
+//
+//            (C)2013-2016    SCU FYclub-RDD
+//
+
+
 define(['iQuery'],  function ($) {
 
     var BOM = self,  DOM = self.document;

@@ -1,32 +1,12 @@
-(function (BOM) {
+if (typeof this.define != 'function')
+    this.define = function () {
+        return  arguments[arguments.length - 1]();
+    };
 
-    var iQuery;
+define('iQuery',  [],function () {
 
-    BOM.define = (typeof BOM.define == 'function')  ?
-        BOM.define  :
-        function () {
-            var iExport = arguments[arguments.length - 1](iQuery, iQuery);
-
-            if (iExport && iExport.fn && iExport.fn.jquery)
-                iQuery = iExport;
-        };
 
 (function (BOM) {
-
-    var iQuery;
-
-    BOM.define = (typeof BOM.define == 'function')  ?
-        BOM.define  :
-        function () {
-            var iExport = arguments[arguments.length - 1](iQuery, iQuery);
-
-            if (iExport && iExport.fn && iExport.fn.jquery)
-                iQuery = iExport;
-        };
-
-define('ES-5',[],function () {
-
-    var BOM = self;
 
     /* ----- Object Patch ----- */
 
@@ -178,10 +158,11 @@ define('ES-5',[],function () {
     for (var i = 0;  i < Console_Method.length;  i++)
         BOM.console[ Console_Method[i] ] = _Notice_;
 
-});
-define('iCore',['ES-5'],  function () {
+})(self);
 
-    var BOM = self,  DOM = self.document;
+
+
+(function (BOM, DOM) {
 
 /* ---------- UA Check ---------- */
     var UA = navigator.userAgent;
@@ -935,7 +916,7 @@ define('iCore',['ES-5'],  function () {
                 var $_Temp = [ ],  $_Result = [ ];
 
                 for (var i = 0;  i < iSet.length;  i++) {
-                    $_Temp[i] = new String(iSet[i].sourceIndex);
+                    $_Temp[i] = new String(iSet[i].sourceIndex + 1e8);
                     $_Temp[i].DOM = iSet[i];
                 }
                 $_Temp.sort();
@@ -1010,8 +991,7 @@ define('iCore',['ES-5'],  function () {
         });
     }
 
-    var $ = iQuery;
-    $.fn = $.prototype;
+    var $ = BOM.iQuery = iQuery;
 
 
     /* ----- iQuery Static Method ----- */
@@ -1251,6 +1231,7 @@ define('iCore',['ES-5'],  function () {
     DOM_Proto.matches = DOM_Proto.matches || DOM_Proto.webkitMatchesSelector ||
         DOM_Proto.msMatchesSelector || DOM_Proto.mozMatchesSelector;
 
+    $.fn = $.prototype;
     $.fn.extend = $.extend;
 
     $.fn.extend({
@@ -2037,10 +2018,12 @@ define('iCore',['ES-5'],  function () {
     };
 
     return $;
-});
-define('iEvent',['iCore'],  function ($) {
 
-    var BOM = self,  DOM = self.document;
+})(self, self.document);
+
+
+
+(function (BOM, DOM, $) {
 
     var Mutation_Event = $.makeSet(
             'DOMContentLoaded',
@@ -2715,10 +2698,11 @@ define('iEvent',['iCore'],  function ($) {
         });
     });
 
-});
-define('IE-8',['iCore'],  function ($) {
+})(self, self.document, self.iQuery);
 
-    var BOM = self,  DOM = self.document;
+
+
+(function (BOM, DOM, $) {
 
     if ($.browser.modern)  return;
 
@@ -3035,10 +3019,11 @@ define('IE-8',['iCore'],  function ($) {
         return iXML;
     };
 
-});
-define('iAnimation',['iCore'],  function ($) {
+})(self, self.document, self.iQuery);
 
-    var BOM = self,  DOM = self.document;
+
+
+(function (BOM, DOM, $) {
 
     /* ----- Atom Effect ----- */
 
@@ -3347,10 +3332,11 @@ define('iAnimation',['iCore'],  function ($) {
         return this;
     };
 
-});
-define('iAJAX',['iEvent'],  function ($) {
+})(self, self.document, self.iQuery);
 
-    var BOM = self,  DOM = self.document;
+
+
+(function (BOM, DOM, $) {
 
     /* ----- XML HTTP Request ----- */
 
@@ -3793,10 +3779,11 @@ define('iAJAX',['iEvent'],  function ($) {
         return this;
     };
 
-});
-define('HTML-5',['iCore'],  function ($) {
+})(self, self.document, self.iQuery);
 
-    var BOM = self,  DOM = self.document;
+
+
+(function (BOM, DOM, $) {
 
     if (! ($.browser.msie < 11))  return;
 
@@ -3907,10 +3894,11 @@ define('HTML-5',['iCore'],  function ($) {
         this.pushState.apply(this, arguments);
     };
 
-});
-define('HTML-5_Form',['iCore'],  function ($) {
+})(self, self.document, self.iQuery);
 
-    var BOM = self,  DOM = self.document;
+
+
+(function (BOM, DOM, $) {
 
     if (! (($.browser.msie < 10)  ||  $.browser.ios))
         return;
@@ -3956,12 +3944,14 @@ define('HTML-5_Form',['iCore'],  function ($) {
         return true;
     };
 
-});
+})(self, self.document, self.iQuery);
+
+
 //
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2016-05-14)  Stable
+//      [Version]    v1.0  (2016-05-16)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -3971,20 +3961,35 @@ define('HTML-5_Form',['iCore'],  function ($) {
 //
 
 
-define('iQuery',[
-    'ES-5',
-    'iCore', 'iEvent',
-    'IE-8',
-    'iAnimation', 'iAJAX',
-    'HTML-5', 'HTML-5_Form'
-],  function () {
-    return  (self.$ = self.jQuery = self.iQuery = arguments[1]);
+
+(function (BOM, DOM, $) {
+
+    if (typeof BOM.jQuery != 'function')  BOM.$ = BOM.jQuery = $;
+
+    return $;
+
+})(self, self.document, self.iQuery);
+
+
 });
 
-})(self);
-define('EasyImport',['iQuery'],  function ($) {
 
-    var BOM = self,  DOM = self.document;
+//
+//                >>>  EasyImport.js  <<<
+//
+//
+//      [Version]    v1.2  (2016-05-16)  Stable
+//
+//      [Usage]      A Asynchronous & Responsive Loader
+//                   for Resource File in Web Browser.
+//
+//
+//            (C)2013-2016    SCU FYclub-RDD
+//
+
+
+
+(function (BOM, DOM, $) {
 
 /* ----------- Standard Mode Meta Patches ----------- */
 
@@ -4290,6 +4295,4 @@ define('EasyImport',['iQuery'],  function ($) {
         return true;
     };
 
-});
-
-})(self);
+})(self, self.document, self.iQuery);

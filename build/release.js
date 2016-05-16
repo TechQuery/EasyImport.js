@@ -1,11 +1,15 @@
 ({
     baseUrl:                    '../source',
     name:                       'EasyImport',
-    out:                        '../release/EasyImport.min.js',
+    out:                        '../EasyImport.min.js',
     generateSourceMaps:         true,
     preserveLicenseComments:    false,
-    wrap:                       {
-        startFile:    'xWrap_0.frag',
-        endFile:      'xWrap_1.frag'
+    onBuildWrite:    function (iName) {
+        if (iName != 'EasyImport')  return arguments[2];
+
+        return arguments[2]
+            .replace(/^define[\s\S]+?(function \()[^\)]*/m,  "\n($1BOM, DOM, $")
+            .replace(/\s+var BOM.+?;/, '')
+            .replace(/\}\).$/,  "})(self, self.document, self.iQuery);");
     }
 });
