@@ -109,7 +109,7 @@ define(['iQuery'],  function ($) {
             charset:    'UTF-8',
             'class':    'EasyImport'
         }),
-        $_BOM = $(BOM),  $_DOM = $(DOM);
+        $_DOM = $(DOM);
 
 
 /* ---------- DOM Load-Engine ---------- */

@@ -73,8 +73,29 @@
     </head>
 ```
 
-【项目缘起】
-------
+## 【参与开发】
+
+### （〇）环境搭建
+ 1. 安装 **Git**（比 SVN 更适合 **开源团队**）
+ 2. 安装 **Node.JS** 最新 LTS 版
+
+### （一）从源码构建
+
+UNIX-Shell、Windows-CMD 通用脚本 ——
+
+```Shell
+npm install -g requirejs
+npm install -g uglify-js
+
+mkdir ./EasyImport.js;
+git clone https://git.oschina.net/Tech_Query/EasyImport.js.git ./EasyImport.js
+
+node r.js -o build/source.js                                             #  EasyImport.js
+uglifyjs EasyImport.js -c -m -o EasyImport.min.js --source-map=EasyImport.min.map    #  EasyImport.min.js  EasyImport.min.map
+```
+
+## 【项目缘起】
+
 　　我在做[《i飞扬》电子杂志 HTML5 在线版][2]的过程中，为了在不改变 **Web 前端程序猿的编程思维习惯**的前提下，保证整个 **WebApp 的好用、可靠**，自己开发了一个**【JavaScript 文件响应式异步加载器】**—— [EasyImport.js][4]。开始只是一段放在 HTML `<head />` 中的小脚本，没觉得是个多么复杂的东西。但随着应用的深入，要想做到自己定下的目标，**代码不断地迭代**，期间也因为严重的 Bug 而怀疑它的价值，所以有了后来的一次较大的局部重构。
 
 　　但辛劳总会有收获 —— 个人更深刻地理解了 **JavaScript**、**DOM** 的一些细节，它本身也到了足够成熟的地步，作为几个**线上实用项目的基础库**，运行在很多人的浏览器中~
