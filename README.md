@@ -90,8 +90,8 @@ npm install -g uglify-js
 mkdir ./EasyImport.js;
 git clone https://git.oschina.net/Tech_Query/EasyImport.js.git ./EasyImport.js
 
-node r.js -o build/source.js                                             #  EasyImport.js
-uglifyjs EasyImport.js -c -m -o EasyImport.min.js --source-map=EasyImport.min.map    #  EasyImport.min.js  EasyImport.min.map
+node r.js -o build/source.js
+uglifyjs EasyImport.js -c -m -o EasyImport.min.js --source-map=EasyImport.min.map
 ```
 
 ## 【项目缘起】
