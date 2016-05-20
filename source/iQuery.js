@@ -364,8 +364,9 @@ define('iQuery',  function () {
         type:             function (iValue) {
             if (iValue === null)  return 'null';
 
-            var iType = typeof  (iValue ? iValue.valueOf() : iValue);
-
+            var iType = typeof (
+                    (iValue && iValue.valueOf)  ?  iValue.valueOf()  :  iValue
+                );
             return  (iType != 'object')  ?  iType  :
                 Object.prototype.toString.call(iValue)
                     .split(' ')[1].slice(0, -1).toLowerCase();
@@ -534,9 +535,10 @@ define('iQuery',  function () {
             try {
                 iType = $.type( iVar );
 
-                iType = (iType == 'object')  ?  iVar.constructor.name  :  (
-                    iType[0].toUpperCase() + iType.slice(1)
-                );
+                if ((iType == 'object')  &&  iVar.constructor.name)
+                    iType = iVar.constructor.name;
+                else
+                    iType = iType[0].toUpperCase() + iType.slice(1);
             } catch (iError) {
                 return 'Window';
             }
@@ -651,7 +653,11 @@ define('iQuery',  function () {
             return ((
                 arguments[0] || BOM.location.href
             ).match(/^(\w+:)?\/\/[^\/]+/) || [ ])[0];
-        }
+        },
+        cssPX:            RegExp([
+            'width', 'height', 'padding', 'border-radius', 'margin',
+            'top', 'right', 'bottom',  'left'
+        ].join('|'))
     });
 
 })(self,  self.document,  self.iQuery || iQuery);
@@ -789,11 +795,6 @@ define('iQuery',  function () {
     };
 
     /* ----- DOM Style ----- */
-    $.cssPX = RegExp([
-        'width', 'height', 'padding', 'border-radius', 'margin',
-        'top', 'right', 'bottom',  'left'
-    ].join('|'));
-
     _DOM_.Style = {
         get:           function (iElement, iName) {
             if ((! iElement)  ||  ($.Type(iElement) in _DOM_.TypeMap.root))
@@ -1842,6 +1843,8 @@ define('iQuery',  function () {
             }
 
             for (var i = 0;  i < $_Path.length;  i++) {
+                iEvent.currentTarget = $_Path[i];
+
                 Proxy_Handler.call($_Path[i],  iEvent,  (! i) && arguments[2]);
 
                 if (iEvent.cancelBubble)  break;
@@ -2145,7 +2148,26 @@ define('iQuery',  function () {
 
 (function (BOM, DOM, $) {
 
-    /* ----- Focus AnyWhere ----- */
+/* ---------- Event from Pseudo ---------- */
+
+    $.Event.prototype.isPseudo = function () {
+        var $_This = $(this.currentTarget);
+
+        var iOffset = $_This.offset();
+
+        return Boolean(
+            (this.pageX  &&  (
+                (this.pageX < iOffset.left)  ||
+                (this.pageX  >  (iOffset.left + $_This.width()))
+            ))  ||
+            (this.pageY  &&  (
+                (this.pageY < iOffset.top)  ||
+                (this.pageY  >  (iOffset.top + $_This.height()))
+            ))
+        );
+    };
+
+/* ---------- Focus AnyWhere ---------- */
 
     var DOM_Focus = $.fn.focus,
         iFocusable = [
@@ -2160,7 +2182,7 @@ define('iQuery',  function () {
         return  DOM_Focus.apply(this, arguments);
     };
 
-    /* ----- Single Finger Touch ----- */
+/* ---------- Single Finger Touch ---------- */
 
     function get_Touch(iEvent) {
         if (! iEvent.timeStamp)
@@ -2220,7 +2242,7 @@ define('iQuery',  function () {
         }
     );
 
-    /* ----- Text Input Event ----- */
+/* ---------- Text Input Event ---------- */
 
     function TypeBack(iHandler, iKey, iEvent) {
         var $_This = $(this);
@@ -2271,7 +2293,7 @@ define('iQuery',  function () {
         return this;
     };
 
-    /* ----- Cross Page Event ----- */
+/* ---------- Cross Page Event ---------- */
 
     function CrossPageEvent(iType, iSource) {
         if (typeof iType == 'string') {
@@ -2340,7 +2362,7 @@ define('iQuery',  function () {
         );
     };
 
-    /* ----- Mouse Wheel Event ----- */
+/* ---------- Mouse Wheel Event ---------- */
 
     if (! $.browser.mozilla)  return;
 
@@ -2506,7 +2528,9 @@ define('iQuery',  function () {
             var iStyle = this[ iName.toCamelCase() ];
             var iNumber = parseFloat(iStyle);
 
-            return  isNaN(iNumber) ? iStyle : (iNumber / iScale);
+            return  isNaN(iNumber) ? iStyle : (
+                (iNumber / iScale)  +  ($.cssPX[iName] ? 'px' : '')
+            );
         },
         setPropertyValue:    function (iName, iValue) {
             this[this.length++] = iName;
@@ -3403,16 +3427,22 @@ define('iQuery',  function () {
         fadeIn:     {opacity:  1},
         fadeOut:    {opacity:  0},
         slideUp:    {
-            overflow:    'hidden',
-            height:      0,
-            padding:     0,
-            opacity:     0
+            overflow:            'hidden',
+            height:              0,
+            'padding-left':      0,
+            'padding-right':     0,
+            'padding-top':       0,
+            'padding-bottom':    0,
+            opacity:             0
         },
         slideDown:    {
-            overflow:    'auto',
-            height:      'auto',
-            padding:     'auto',
-            opacity:     1
+            overflow:            'auto',
+            height:              'auto',
+            'padding-left':      'auto',
+            'padding-right':     'auto',
+            'padding-top':       'auto',
+            'padding-bottom':    'auto',
+            opacity:             1
         }
     },  function (CSS_Next) {
         return  function () {
@@ -3816,7 +3846,13 @@ define('iQuery',  function () {
         return this;
     };
 
-    /* ----- Form Element AJAX Submit ----- */
+})(self,  self.document,  self.iQuery || iQuery);
+
+
+
+(function (BOM, DOM, $) {
+
+/* ---------- Form Element AJAX Submit ---------- */
 
     $.fn.ajaxSubmit = function (iCallback) {
         if (! this.length)  return this;
@@ -3829,10 +3865,21 @@ define('iQuery',  function () {
 
             $_Form.data('_AJAX_Submitting_', 1);
 
-            var iMethod = ($_Form.attr('method') || 'Get').toUpperCase();
+            if (
+                $_Form.find('input[type="file"]').length &&
+                ($.browser.msie < 10)
+            ) {
+                var iDHR = new BOM.DOMHttpRequest();
+                iDHR.open('POST', $_Form)
+                iDHR.onready = iCallback;
+                iDHR.send();
+                return;
+            }
 
-            if ((iMethod in HTTP_Method)  ||  (iMethod == 'GET'))
-                $[ iMethod.toLowerCase() ](
+            var iMethod = ($_Form.attr('method') || 'Get').toLowerCase();
+
+            if (typeof $[iMethod] == 'function')
+                $[iMethod](
                     this.action,
                     $.paramJSON('?' + $_Form.serialize()),
                     function () {
@@ -4025,7 +4072,7 @@ define('iQuery',  function () {
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2016-05-19)  Stable
+//      [Version]    v1.0  (2016-05-20)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
