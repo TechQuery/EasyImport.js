@@ -112,34 +112,9 @@ define('iQuery',  [],function () {
         });
     };
 
-    /* ----- BOM/DOM Fix  v0.4 ----- */
+    /* ----- Console Fix  v0.1 ----- */
 
-    BOM.new_Window_Fix = function (Fix_More) {
-        if (! this)  return false;
-
-        try {
-            var _Window_ = this.opener,
-                This_DOM = this.document;
-
-            This_DOM.defaultView = this;
-
-            if (_Window_ && (this.location.href == 'about:blank'))
-                This_DOM.domain = _Window_.document.domain;
-
-            if ((_Window_ || this).navigator.userAgent.match(/MSIE 8/i))
-                This_DOM.head = This_DOM.documentElement.firstChild;
-        } catch (iError) {
-            return false;
-        }
-        if (Fix_More)  Fix_More.call(this);
-
-        return true;
-    };
-
-    BOM.new_Window_Fix();
-
-
-    if (console)  return;
+    if (BOM.console)  return;
 
     function _Notice_() {
         var iString = [ ];
@@ -1329,18 +1304,19 @@ define('iQuery',  [],function () {
             var iPath = (typeof $_Match == 'string'),
                 iMatch = (typeof Element.prototype.matches == 'function');
 
-            for (var i = 0, $_Is;  i < this.length;  i++) {
+            for (var i = 0;  i < this.length;  i++) {
                 if (this[i] === $_Match)  return true;
 
                 if (iPath && iMatch)  try {
-                    return this[i].matches($_Match);
+                    if (this[i].matches( $_Match ))  return true;
                 } catch (iError) { }
 
                 if (! this[i].parentNode)  $('<div />')[0].appendChild( this[i] );
 
-                $_Is = iPath  ?  $($_Match, this[i].parentNode)  :  $($_Match);
-
-                return  ($_Is.index( this[i] )  >  -1);
+                if (-1  <  $.inArray(this[i], (
+                    iPath  ?  $($_Match, this[i].parentNode)  :  $($_Match)
+                )))
+                    return true;
             }
 
             return false;
@@ -2090,27 +2066,26 @@ define('iQuery',  [],function () {
     $.start('DOM_Ready');
 
     function DOM_Ready_Event() {
-        if (DOM.isReady || (
-            (this !== DOM)  &&  (
-                (DOM.readyState != 'complete')  ||
-                (!  (DOM.body || { }).lastChild)
-            )
+        if ((typeof arguments[2] == 'number')  &&  (
+            (DOM.readyState != 'complete')  ||  (! (DOM.body || { }).lastChild)
         ))
             return;
 
-        DOM.isReady = true;
-        BOM.clearTimeout( $_DOM.data('Ready_Timer') );
-        $_DOM.data('Load_During', $.end('DOM_Ready'))
-            .data('Ready_Event', arguments[0]);
-        console.info('[DOM Ready Event]');
-        console.log(this, arguments);
+        if (! DOM.isReady) {
+            DOM.isReady = true;
 
-        $_DOM.trigger('ready');
+            $_DOM.data('Load_During', $.end('DOM_Ready'))
+                .data('Ready_Event', arguments[0]);
+            console.info('[DOM Ready Event]');
+            console.log(this, arguments);
+
+            $_DOM.trigger('ready');
+        }
 
         return false;
     }
 
-    $_DOM.data('Ready_Timer',  $.every(0.5, DOM_Ready_Event));
+    $.every(0.5, DOM_Ready_Event);
     $_DOM.one('DOMContentLoaded', DOM_Ready_Event);
     $(BOM).one('load', DOM_Ready_Event);
 
@@ -3509,13 +3484,13 @@ define('iQuery',  [],function () {
 
         if (typeof iArgs[iArgs.length - 1]  !=  'function')  return;
 
-        var iCallback = iArgs.pop();
+        var iTable = this.table,  iCallback = iArgs.pop();
 
-        $.each(this.table[0],  function (Index) {
-            if (this == null)  return;
+        $.each(iTable[0],  function (Index) {
+            if (arguments[1] == null)  return;
 
-            for (var i = 0, _Condition_;  i < iArgs.length;  i++) {
-                _Condition_ = _This_.table[i + 1][Index];
+            for (var i = 0, _Condition_;  iArgs[i] && iTable[i + 1];  i++) {
+                _Condition_ = iTable[i + 1][Index];
 
                 if (_Condition_ === undefined) {
 
@@ -3534,7 +3509,7 @@ define('iQuery',  [],function () {
             }
 
             if (false  ===  iCallback.call(_This_, this))
-                _This_.table[0][Index] = null;
+                iTable[0][Index] = null;
         });
     }
 
@@ -3707,13 +3682,14 @@ define('iQuery',  [],function () {
             statusText:      arguments[2],
             responseText:    arguments[3].text,
             responseType:    (
-                (iHeader['Content-Type'] ||　'').split(';')[0].split('/')[1]
+                (iHeader['Content-Type'] || '').split(';')[0].split('/')[1]
             )  ||  'text'
         });
 
         switch ( this.responseType ) {
             case 'text':    ;
-            case 'json':    {
+            case 'html':    this.response = this.responseText;
+            case 'json':
                 try {
                     this.response = $.parseJSON( this.responseText );
                     this.responseType = 'json';
@@ -3729,8 +3705,6 @@ define('iQuery',  [],function () {
                     } catch (iError) { }
                 }
                 break;
-            }
-            case 'html':    this.response = this.responseText;    break;
             case 'xml':     this.response = this.responseXML;
         }
 
@@ -4252,7 +4226,7 @@ define('iQuery',  [],function () {
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v1.0  (2016-05-25)  Stable
+//      [Version]    v1.0  (2016-05-27)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
