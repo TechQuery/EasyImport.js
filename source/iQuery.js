@@ -204,8 +204,8 @@ define('iQuery',  function () {
         }
 
         for (var i = 0;  i < iArgs.length;  i++)
-            iSet[ iArgs[i] ] = (typeof iValue == 'function')  ?
-                iValue() : iValue;
+            iSet[ iArgs[i] ] = (typeof iValue != 'function')  ?
+                iValue  :  iValue( iArgs[i] );
 
         return iSet;
     };
@@ -683,7 +683,7 @@ define('iQuery',  function () {
         now:        Date.now,
         every:      function (iSecond, iCallback) {
             var _BOM_ = this._Root_,
-                iTimeOut = (iSecond || 1) * 1000,
+                iTimeOut = (iSecond || 0.01) * 1000,
                 iStart = this.now(),
                 Index = 0;
 
