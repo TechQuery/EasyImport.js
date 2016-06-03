@@ -7,14 +7,23 @@
 
  1. 脚本加载**顺序即依赖** —— 沿用 **HTML 编程思维习惯**，替代 `<script />` 加载页面中**所有外置、内置 JavaScript 脚本**
  2. 书写形式**简洁明了** —— 充分运用 **原生 JavaScript 语法**，不自创小语法
- 3. **jQuery API** 兼容 —— 基于 [iQuery](http://git.oschina.net/Tech_Query/iQuery) 开发，并开放给**应用开发者**使用，逻辑不复杂的网页无需再加载 jQuery 或 Zepto
+ 3. **jQuery API** 兼容 —— 基于 [iQuery][1] 开发，并开放给**应用开发者**使用，逻辑不复杂的网页无需再加载 jQuery 或 Zepto
 
-【稳定版简史】
- - **最新稳定版 v1.2** —— 发布于 2015年9月9日
- - 稳定版 v1.1 —— 发布于 2015年8月27日（同时发布的 Modern 版 删去了 iQuery、EasyImport.js 中的 IE 8 兼容代码）
- - 首个基于 iQuery 的稳定版 v0.9 —— 发布于 2015年5月10日
- - 首个开源稳定版 v0.6 的发布博文 —— [http://log.fyscu.com/index.php/archives/130/][1]
- - 首个稳定版 v0.4 —— 完成于 2014年中
+
+## 【版本简史】
+
+ - v1.3 Alpha  —— 2016年6月3日    首个支持 AMD 规范的版本
+ - v1.2 Stable —— 2016年1月29日
+   - **多媒体资源 延迟加载** 支持 背景图、动态插入元素
+   - 遮罩层/模态框组件 移出并贡献给 [EasyWebUI][2] 项目，并适配其开放的 `loading` 通用 **加载进度事件**接口
+   - 新增 全局异常监控（实验特性）
+ - v1.1 Stable —— 2015年8月27日
+   - **条件加载、异步队列 改为 更自然、灵活的 JS 对象字面量写法**，大幅精简 加载队列实现逻辑
+   - 支持 `<img />`、`<iframe />` 延迟加载
+   - 同时发布的 Modern 版 删去了 iQuery、EasyImport.js 中的 IE 8 兼容代码
+ - v0.9 Stable —— 2015年5月10日   基于 iQuery（jQuery API 兼容库）重写核心代码
+ - v0.6 Stable —— 2014年11月24日  首个开源版本（[发布博文][3]）
+ - v0.4 Stable —— 2014年中期      首个功能稳定版
 
 
 ## 【核心特性】
@@ -37,9 +46,9 @@
 
 ## 【典型案例】
 
-[**《i飞扬》电子杂志 HTML 5 在线版**][2]
+[**《i飞扬》电子杂志 HTML 5 在线版**][4]
 
-以下**示例代码**用 **EasyImport.js v1.1+** 重构自[《i飞扬 19期》][3]的 HTML 源码 ——
+以下**示例代码**用 **EasyImport.js v1.1+** 重构自[《i飞扬 19期》][5]的 HTML 源码 ——
 ```html
     <head>
     ......
@@ -96,13 +105,15 @@ uglifyjs EasyImport.js -c -m -o EasyImport.min.js --source-map=EasyImport.min.ma
 
 ## 【项目缘起】
 
-　　我在做[《i飞扬》电子杂志 HTML5 在线版][2]的过程中，为了在不改变 **Web 前端程序猿的编程思维习惯**的前提下，保证整个 **WebApp 的好用、可靠**，自己开发了一个**【JavaScript 文件响应式异步加载器】**—— [EasyImport.js][4]。开始只是一段放在 HTML `<head />` 中的小脚本，没觉得是个多么复杂的东西。但随着应用的深入，要想做到自己定下的目标，**代码不断地迭代**，期间也因为严重的 Bug 而怀疑它的价值，所以有了后来的一次较大的局部重构。
+　　我在做[《i飞扬》电子杂志 HTML5 在线版][4]的过程中，为了在不改变 **Web 前端程序猿的编程思维习惯**的前提下，保证整个 **WebApp 的好用、可靠**，自己开发了一个**【JavaScript 文件响应式异步加载器】**—— [EasyImport.js][6]。开始只是一段放在 HTML `<head />` 中的小脚本，没觉得是个多么复杂的东西。但随着应用的深入，要想做到自己定下的目标，**代码不断地迭代**，期间也因为严重的 Bug 而怀疑它的价值，所以有了后来的一次较大的局部重构。
 
 　　但辛劳总会有收获 —— 个人更深刻地理解了 **JavaScript**、**DOM** 的一些细节，它本身也到了足够成熟的地步，作为几个**线上实用项目的基础库**，运行在很多人的浏览器中~
 
 
 
-  [1]: http://log.fyscu.com/index.php/archives/130/
-  [2]: http://mag.fyscu.com
-  [3]: http://mag.fyscu.com/iWB/iBookView.php?name=iFY&index=19
-  [4]: http://bbs.fyscu.com/forum.php?mod=viewthread&tid=4808
+  [1]: http://git.oschina.net/Tech_Query/iQuery
+  [2]: http://git.oschina.net/Tech_Query/EasyWebUI
+  [3]: http://log.fyscu.com/index.php/archives/130/
+  [4]: http://mag.fyscu.com
+  [5]: http://mag.fyscu.com/iWB/iBookView.php?name=iFY&index=19
+  [6]: http://bbs.fyscu.com/forum.php?mod=viewthread&tid=4808
