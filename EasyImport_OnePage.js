@@ -4351,23 +4351,39 @@ define('iQuery',  function () {
     }
 
     function InnerRequire() {
-        return  AMD_Module[AbsolutePath( arguments[0] )].exports;
+        if (typeof arguments[0] == 'string')
+            return  AMD_Module[AbsolutePath( arguments[0] )].exports;
+
+        BOM.require.apply(BOM, arguments);
     }
 
     function New_Module(iPath, iName, iDepend, iModule) {
-        AMD_Module[iPath] = {
-            name:        iName  ||  $.fileName(iPath),
-            parents:     iDepend  ||  [ ],
-            children:    { }
-        };
+        var _Module_ = AMD_Module[iPath] = {
+                name:        iName  ||  $.fileName(iPath),
+                parents:     iDepend  ||  [ ],
+                children:    { }
+            };
 
-        if (typeof iModule == 'function')
-            AMD_Module[iPath].defination = iModule;
-        else if ($.isPlainObject( iModule ))
-            $.extend(AMD_Module[iPath], {
+        if ($.isPlainObject( iModule ))
+            return  $.extend(_Module_, {
                 executed:    true,
                 exports:     iModule
             });
+
+        if (typeof iModule != 'function')  return;
+
+        _Module_.defination = iModule;
+
+        var iRequire = iModule.toString().match(
+                /=\s*require\(\s*('|")\S+('|")\s*\)/g
+            );
+        if (iRequire)
+            _Module_.parents = _Module_.parents.concat(
+                $.map(iRequire,  function () {
+                    return arguments[0].split(/'|"/)[1];
+                })
+            );
+        _Module_.parents = $.map(_Module_.parents, AbsolutePath);
     }
 
     function AMD_Load(iPath) {
@@ -4413,8 +4429,6 @@ define('iQuery',  function () {
             (iArgs[0] instanceof Array)  &&  iArgs.shift(),
             iArgs[0]
         );
-
-        AMD_Module[iPath].parents = $.map(AMD_Module[iPath].parents, AbsolutePath);
 
         $.each($.extend({ }, AMD_Module),  AMD_Load);
     };
