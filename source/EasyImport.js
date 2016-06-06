@@ -3,7 +3,7 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.2  (2016-05-16)  Stable
+//      [Version]    v1.2  (2016-06-06)  Stable
 //
 //      [Usage]      A Asynchronous & Responsive Loader
 //                   for Resource File in Web Browser.
@@ -69,14 +69,7 @@ define(['iQuery'],  function ($) {
 
 /* ---------- Loading Queue ---------- */
 
-    var Root_Path = (function ($_Script) {
-            for (var i = 0, iPath;  i < $_Script.length;  i++) {
-                iPath = $_Script[i].src.match(
-                    /(.+)[^\/]*EasyImport[^\/]*\.js[^\/]*$/i
-                );
-                if (iPath)  return iPath[1];
-            }
-        })( $('head > script') );
+    var Root_Path = $.filePath( DOM.currentScript.src )  +  '/';
 
     function Queue_Filter(iList) {
         for (var i = 0, _Group_;  i < iList.length;  i++) {
