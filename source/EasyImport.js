@@ -2,7 +2,7 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.3  (2016-06-03)  Alpha
+//      [Version]    v1.3  (2016-06-06)  Alpha
 //
 //      [Usage]      A Asynchronous & Responsive Loader
 //                   for Resource File in Web Browser.
@@ -16,15 +16,7 @@ define('EasyImport',  ['iQuery'],  function ($) {
 
     var BOM = self,  DOM = self.document;
 
-    function This_Script() {
-        try {
-            throw  new Error('Script_Name');
-        } catch (iError) {
-            return iError.stack.match(/\s+at\s+(http(s)?:\/\/\S+.js)/)[1];
-        }
-    }
-
-    var AMD_Module = { },  Root_Path = This_Script().replace(/[^\/]+$/, '');
+    var AMD_Module = { },  Root_Path = DOM.currentScript.src.replace(/[^\/]+$/, '');
 
     function AbsolutePath(iPath) {
         iPath = (iPath.match(/^(\w+:)?\/\//) ? '' : Root_Path)  +  iPath;
@@ -99,13 +91,13 @@ define('EasyImport',  ['iQuery'],  function ($) {
             this.exports = this.defination.apply(BOM, iRequire);
             this.executed = true;
 
-            console.log('AMD load:  ' + iPath + '.js');
+            console.log('[' + Date.now() + '] AMD load:  ' + iPath + '.js');
         }
     }
 
     BOM.define = function () {
         var iArgs = $.makeArray(arguments),
-            iPath = This_Script().replace(/\.js(\?.*)?/, '');
+            iPath = DOM.currentScript.src.replace(/\.js(\?.*)?/, '');
 
         New_Module(
             iPath,
