@@ -1,9 +1,8 @@
-
 //
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.2  (2016-06-06)  Stable
+//      [Version]    v1.2  (2016-06-14)  Stable
 //
 //      [Usage]      A Asynchronous & Responsive Loader
 //                   for Resource File in Web Browser.
@@ -226,10 +225,10 @@ define(['iQuery'],  function ($) {
 
             for (var i = 0;  i < iLazy.length;  i++)
                 if (
-                    ($.inArray(iLazy[i], this.finish)  ==  -1)  &&
-                    (false  ===  _This_.onScroll( iLazy[i] ))
+                    ($.inArray(iLazy[i], _This_.finish)  ==  -1)  &&
+                    (false  !==  _This_.onScroll( iLazy[i] ))
                 ) {
-                    this.finish.push( iLazy[i] );
+                    _This_.finish.push( iLazy[i] );
 
                     if (--_This_.count == 0)
                         _This_.$_ViewPort.unbind('scroll', arguments.callee);
