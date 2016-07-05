@@ -1,9 +1,11 @@
-if ((typeof this.define != 'function')  ||  (! this.define.amd))
-    this.define = function () {
-        return  arguments[arguments.length - 1]();
-    };
+(function () {
 
-define('iQuery',  function () {
+    if ((typeof this.define != 'function')  ||  (! this.define.amd))
+        arguments[0]();
+    else
+        this.define('iQuery', arguments[0]);
+
+})(function () {
 
     var iQuery = {fn:  { }};
 
@@ -363,6 +365,8 @@ define('iQuery',  function () {
                     .split(' ')[1].slice(0, -1).toLowerCase();
         },
         isNumeric:        function (iValue) {
+            iValue = (iValue && iValue.valueOf)  ?  iValue.valueOf()  :  iValue;
+
             if ((iValue === '')  ||  (iValue === Infinity)  ||  isNaN(iValue))
                 return false;
 
@@ -2479,23 +2483,65 @@ define('iQuery',  function () {
 
 /* ---------- Computed Style ---------- */
 
-    function CSSStyleDeclaration() {
-        $.extend(this, arguments[0].currentStyle, {
+    var PX_Attr = $.makeSet('left', 'right', 'top', 'bottom', 'width', 'height'),
+        DX_Filter = 'DXImageTransform.Microsoft.';
+
+    function ValueUnit(iValue) {
+        return  iValue.slice((parseFloat(iValue) + '').length);
+    }
+
+    function toPX(iName) {
+        var iValue = this[iName];
+        var iNumber = parseFloat(iValue);
+
+        if (isNaN( iNumber ))  return;
+
+        if (iNumber !== 0)
+            switch (ValueUnit( iValue )) {
+                case 'em':    {
+                    var Font_Size =
+                        this.ownerNode.parentNode.currentStyle.fontSize;
+
+                    iNumber *= parseFloat(Font_Size);
+
+                    if (ValueUnit(Font_Size) != 'pt')  break;
+                }
+                case 'pt':    iNumber *= (BOM.screen.deviceXDPI / 72);    break;
+                default:      return;
+            }
+
+        this[iName] = iNumber + 'px';
+    }
+
+    function CSSStyleDeclaration(iDOM) {
+        var iStyle = iDOM.currentStyle;
+
+        $.extend(this, {
             length:       0,
             cssText:      '',
-            ownerNode:    arguments[0]
+            ownerNode:    iDOM
         });
 
-        for (var iName in this) {
-            this[this.length++] = iName.toHyphenCase();
+        for (var iName in iStyle) {
+            this[iName] = (iName in PX_Attr)  &&  iStyle[
+                ('pixel-' + iName).toCamelCase()
+            ];
+            this[iName] = (typeof this[iName] == 'number')  ?
+                (this[iName] + 'px')  :  iStyle[iName];
+
+            if (typeof this[iName] == 'string')  toPX.call(this, iName);
+
             this.cssText += [
                 iName,  ': ',  this[iName],  '; '
             ].join('');
         }
-        this.cssText = this.cssText.trim();
-    }
 
-    var Code_Indent = ' '.repeat(4);
+        this.cssText = this.cssText.trim();
+
+        var iAlpha = iDOM.filters.Alpha  ||  iDOM.filters[DX_Filter + 'Alpha'];
+
+        this.opacity = (iAlpha  ?  (iAlpha.opacity / 100)  :  1)  +  '';
+    }
 
     function toHexInt(iDec, iLength) {
         var iHex = parseInt( Number(iDec).toFixed(0) ).toString(16);
@@ -2518,37 +2564,10 @@ define('iQuery',  function () {
     }
 
     $.extend(CSSStyleDeclaration.prototype, {
-        getPropertyValue:    function (iName) {
-            var iScale = 1;
-
-            switch (iName) {
-                case 'opacity':    {
-                    iName = 'filter';
-                    iScale = 100;
-                }
-            }
-            var iStyle = this[ iName.toCamelCase() ];
-            var iNumber = parseFloat(iStyle);
-
-            if (! isNaN(iNumber)) {
-                switch ( iStyle.slice(-2).toLowerCase() ) {
-                    case 'em':    {
-                        var Font_Size =
-                                this.ownerNode.parentNode.currentStyle.fontSize;
-
-                        iNumber *= parseFloat(Font_Size);
-
-                        if (Font_Size.slice(-2).toLowerCase() != 'pt')  break;
-                    }
-                    case 'pt':    iNumber = iNumber * BOM.screen.deviceXDPI / 72;
-                }
-
-                iStyle =  (iNumber / iScale)  +  ($.cssPX[iName] ? 'px' : '')
-            }
-
-            return iStyle;
+        getPropertyValue:    function () {
+            return  this[ arguments[0].toCamelCase() ];
         },
-        setPropertyValue:    function (iName, iValue) {
+        setProperty:         function (iName, iValue) {
             this[this.length++] = iName;
 
             var iString = '',  iWrapper,  iScale = 1,  iConvert;
@@ -2557,7 +2576,7 @@ define('iQuery',  function () {
 
             if (iName == 'opacity') {
                 iName = 'filter';
-                iWrapper = 'progid:DXImageTransform.Microsoft.Alpha(opacity={n})';
+                iWrapper = 'progid:' + DX_Filter + 'Alpha(opacity={n})';
                 iScale = 100;
             } else if (iRGBA) {
                 iString = iValue.replace(iRGBA[0], '');
@@ -2571,7 +2590,7 @@ define('iQuery',  function () {
                         'rgb(' + iRGBA[1] + ')'
                     );
                 iName = 'filter';
-                iWrapper = 'progid:DXImageTransform.Microsoft.Gradient(startColorStr=#{n},endColorStr=#{n})';
+                iWrapper = 'progid:' + DX_Filter + 'Gradient(startColorStr=#{n},endColorStr=#{n})';
                 iConvert = function (iAlpha, iRGB) {
                     return  toHexInt(parseFloat(iAlpha) * 256, 2) + RGB_Hex(iRGB);
                 };
@@ -2584,12 +2603,14 @@ define('iQuery',  function () {
 
             this[ this[this.length - 1].toCamelCase() ] = iValue + (arguments[2] ? ' !important' : '');
 
-            if (this.ownerNode)
-                this.ownerNode.style.setAttribute(iName,  iValue,  arguments[2] && 'important');
-            else
-                return  [iString, ";\n", iName, ':', Code_Indent, iValue].join('');
+            this.ownerNode.style.setAttribute(
+                iName,  iValue,  arguments[2] && 'important'
+            );
         }
     });
+
+    DOM.documentElement.style.constructor.prototype.setProperty =
+        CSSStyleDeclaration.prototype.setProperty;
 
     BOM.getComputedStyle = function () {
         return  new CSSStyleDeclaration(arguments[0]);
@@ -4331,7 +4352,7 @@ define('iQuery',  function () {
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-07-04)  Stable
+//      [Version]    v2.0  (2016-07-05)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
