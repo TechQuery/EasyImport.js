@@ -324,8 +324,8 @@
 
     $.fn.extend = $.extend = function () {
         var iDeep = (arguments[0] === true);
-        var iTarget,
-            iFirst = iDeep ? 1 : 0;
+
+        var iTarget,  iFirst = iDeep ? 1 : 0;
 
         if (arguments.length  >  (iFirst + 1)) {
             iTarget = arguments[iFirst] || (
@@ -874,10 +874,7 @@
             this._Data_[iElement.dataIndex][iName] = iValue;
         },
         get:       function (iElement, iName) {
-            if (typeof iElement.dataIndex != 'number')
-                iElement.dataIndex = this._Data_.push({ }) - 1;
-
-            var iData =  this._Data_[iElement.dataIndex] || iElement.dataset;
+            var iData = this._Data_[iElement.dataIndex] || iElement.dataset;
 
             if (iName) {
                 iData = iData || { };
@@ -889,7 +886,7 @@
             }
 
             return  ((iData instanceof Array)  ||  $.isPlainObject(iData))  ?
-                    $.extend(true, undefined, iData)  :  iData;
+                    $.extend(true, null, iData)  :  iData;
         },
         clear:     function (iElement, iName) {
             if (typeof iElement.dataIndex != 'number')  return;
@@ -902,39 +899,6 @@
             }
         }
     };
-/* ---------- DOM Constructor ---------- */
-
-    function DOM_Create(TagName, AttrList) {
-        var iNew,  iTag = TagName.match(/^\s*<(.+?)\s*\/?>([\s\S]+)?/);
-
-        if (! iTag)  return  [ DOM.createTextNode(TagName) ];
-
-        if (iTag[2]  ||  (iTag[1].split(/\s/).length > 1)) {
-            iNew = DOM.createElement('div');
-            iNew.innerHTML = TagName;
-            iNew = $.makeArray(iNew.childNodes);
-        } else
-            iNew = [DOM.createElement( iTag[1] )];
-
-        if ((iNew.length == 1)  &&  (iNew[0].nodeType == 1)  &&  AttrList)
-            $.each(AttrList,  function (iKey, iValue) {
-                switch (iKey) {
-                    case 'text':     return  iNew[0].textContent = iValue + '';
-                    case 'html':     return  iNew[0].innerHTML = iValue + '';
-                    case 'css':      return  _DOM_.operate('Style', iNew, iValue);
-                }
-                _DOM_.operate('Attribute', iNew, iKey, iValue);
-            });
-
-        return  iNew[0].parentNode ?
-            $.map(iNew,  function (iDOM, _Index_) {
-                if (iDOM.nodeType == 1) {
-                    iNew[_Index_].parentNode.removeChild(iDOM);
-                    return iDOM;
-                }
-            }) : iNew;
-    }
-
 
 /* ---------- DOM Selector ---------- */
     var iPseudo = {
@@ -1157,10 +1121,20 @@
                 Element_Set = DOM_Search(this.context, Element_Set);
                 Element_Set = (Element_Set.length < 2)  ?
                     Element_Set  :  DOM_Sort(Element_Set);
-            } else
-                Element_Set = DOM_Create(
-                    Element_Set,  $.isPlainObject(iContext) && iContext
-                );
+            } else {
+                Element_Set = _Self_.parseHTML(Element_Set);
+                if (
+                    (Element_Set.length == 1)  &&
+                    (Element_Set[0].nodeType == 1)  &&
+                    $.isPlainObject( iContext )
+                )
+                    for (var iKey in iContext) {
+                        if (typeof this[iKey] == 'function')
+                            (new _Self_( Element_Set[0] ))[iKey]( iContext[iKey] );
+                        else
+                            (new _Self_( Element_Set[0] )).attr(iKey, iContext[iKey]);
+                    }
+            }
         } else if (iType in _DOM_.TypeMap.element)
             Element_Set = [ Element_Set ];
 
@@ -1176,7 +1150,64 @@
 
     /* ----- iQuery Static Method ----- */
 
+    var TagWrapper = $.extend(
+            {
+                area:      {before: '<map>'},
+                legend:    {before: '<fieldset>'},
+                param:     {before: '<object>'}
+            },
+            $.makeSet(['caption', 'thead', 'tbody', 'tfoot', 'tr'],  {
+                before:    '<table>',
+                after:     '</table>',
+                depth:     2
+            }),
+            $.makeSet(['th', 'td'],  {
+                before:    '<table><tr>',
+                depth:     3
+            }),
+            $.makeSet(['optgroup', 'option'],  {before: '<select multiple>'})
+        );
+
     $ = BOM.iQuery = $.extend(iQuery, $, {
+        parseHTML:        function (iHTML, AttrList) {
+            var iTag = iHTML.match(
+                    /^\s*<([^\s\/]+)\s*([^<]*?)\s*(\/?)>([^<]*)((<\/\1>)?)([\s\S]*)/
+                ) || [ ];
+
+            if (iTag[5] === undefined)  iTag[5] = '';
+
+            if (
+                (iTag[5]  &&  (! (iTag.slice(2, 5).join('') + iTag[6])))  ||
+                (iTag[3]  &&  (! (iTag[2] + iTag.slice(4).join(''))))
+            )
+                return  [DOM.createElement( iTag[1] )];
+
+            var iWrapper = TagWrapper[ iTag[1] ],
+                iNew = DOM.createElement('div');
+
+            if (! iWrapper)
+                iNew.innerHTML = iHTML;
+            else {
+                iNew = iWrapper.before  +  iHTML  +  (iWrapper.after || '');
+                iNew = $.trace(iNew,  'firstChild',  iWrapper.depth || 1)
+                    .slice(-1)[0];
+            }
+
+            return $.map(
+                $.makeArray(iNew.childNodes),
+                function (iDOM, _Index_) {
+                    return iDOM.parentNode.removeChild(iDOM);
+                }
+            );
+        },
+        buildFragment:    function (iNode) {
+            var iFragment = DOM.createDocumentFragment();
+
+            for (var i = 0;  iNode[i];  i++)
+                iFragment.appendChild( iNode[i] );
+
+            return iFragment;
+        },
         data:             function (iElement, iName, iValue) {
             return  _DOM_.operate('Data', [iElement], iName, iValue);
         }
@@ -2077,7 +2108,7 @@
         if (! DOM.isReady)
             $_DOM.one('ready', iCallback);
         else
-            iCallback.call(this[0],  $.data(DOM, 'Ready_Event'));
+            iCallback.call(this[0], $_DOM.data('Ready_Event'));
 
         return this;
     };
@@ -2853,10 +2884,7 @@
 (function (BOM, DOM, $) {
 
     $.fn.insertTo = function ($_Target, Index) {
-        var DOM_Set = DOM.createDocumentFragment(),  $_This = [ ];
-
-        for (var i = 0;  this[i];  i++)
-            DOM_Set.appendChild( this[i] );
+        var DOM_Set = $.buildFragment(this),  $_This = [ ];
 
         $($_Target).each(function () {
             var iAfter = $(this.children).eq(Index || 0)[0];
@@ -3266,7 +3294,7 @@
         },
         scrollParents:    function () {
             return Array_Reverse.call(this.pushStack(
-                $.map(this.parents(),  function ($_Parent) {
+                $.map(this.eq(0).parents(),  function ($_Parent) {
                     $_Parent = $($_Parent);
 
                     var iCSS = $_Parent.css([
@@ -3443,6 +3471,8 @@
                     ))
                 )))
                     $_iFrame.remove();
+
+                if ($.browser.msie)  BOM.CollectGarbage();
 
                 return false;
             }
@@ -3931,22 +3961,23 @@
 
         switch ( this.responseType ) {
             case 'text':    ;
-            case 'html':    ;
+            case 'html':    if (this.responseText.match(/^\s*<.+?>/)) {
+                try {
+                    this.response = $.parseXML( this.responseText );
+                    this.responseType = 'xml';
+                } catch (iError) {
+                    this.response = $.buildFragment(
+                        $.parseHTML( this.responseText )
+                    );
+                    this.responseType = 'html';
+                }
+                break;
+            }
             case 'json':
                 try {
                     this.response = $.parseJSON( this.responseText );
                     this.responseType = 'json';
-                } catch (iError) {
-                    if ($.browser.msie != 9)  try {
-                        if (! $.browser.mozilla)
-                            this.response = $.parseXML( this.responseText );
-                        else if (this.responseXML)
-                            this.response = this.responseXML;
-                        else
-                            break;
-                        this.responseType = 'xml';
-                    } catch (iError) { }
-                }
+                } catch (iError) { }
                 break;
             case 'xml':     this.response = this.responseXML;
         }
@@ -4036,8 +4067,6 @@
     $.fn.load = function (iURL, iData, iCallback) {
         if (! this[0])  return this;
 
-        var $_This = this;
-
         iURL = $.split(iURL.trim(), /\s+/, 2, ' ');
 
         if (typeof iData == 'function') {
@@ -4045,43 +4074,23 @@
             iData = null;
         }
 
-        function Append_Back() {
+        var $_This = this;
+
+        $[iData ? 'post' : 'get'](iURL[0], iData, function (iFragment) {
             $_This.children().fadeOut();
 
-            var $_Content = $(arguments[0]);
-            var $_Script = $_Content.filter('script').not('[src]');
+            $_This.empty()[0].appendChild( iFragment );
 
-            arguments[0] = $_Content.not( $_Script )
-                .appendTo( $_This.empty() ).fadeIn();
+            var $_Script = $( iFragment.children )
+                    .filter('script').not('[src]').remove();
 
             for (var i = 0;  i < $_Script.length;  i++)
                 $.globalEval( $_Script[i].text );
 
             if (typeof iCallback == 'function')
-                for (var i = 0;  i < $_This.length;  i++)
+                for (var i = 0;  $_This[i];  i++)
                     iCallback.apply($_This[i], arguments);
-        }
-
-        function Load_Back(iHTML) {
-            if (typeof iHTML != 'string')  return;
-
-            if (! iHTML.match(/<\s*(html|head|body)(\s|>)/i)) {
-                Append_Back.apply(this, arguments);
-                return;
-            }
-
-            var _Context_ = [this, $.makeArray(arguments)];
-
-            $(DOM.body).sandBox(iHTML,  iURL[1],  function ($_innerDOM) {
-                _Context_[1][0] = $_innerDOM;
-
-                Append_Back.apply(_Context_[0], _Context_[1]);
-
-                return false;
-            });
-        }
-
-        $[iData ? 'post' : 'get'](iURL[0], iData, Load_Back);
+        });
 
         return this;
     };
@@ -4373,7 +4382,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-07-08)  Beta
+//      [Version]    v2.0  (2016-07-14)  Beta
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.

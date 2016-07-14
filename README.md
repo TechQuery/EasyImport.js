@@ -96,7 +96,7 @@ UNIX-Shell、Windows-CMD 通用脚本 ——
 npm install -g requirejs
 npm install -g uglify-js
 
-mkdir ./EasyImport.js;
+mkdir ./EasyImport.js
 git clone https://git.oschina.net/Tech_Query/EasyImport.js.git ./EasyImport.js
 
 node r.js -o build/source.js
