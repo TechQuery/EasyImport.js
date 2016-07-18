@@ -1122,12 +1122,10 @@
                 Element_Set = (Element_Set.length < 2)  ?
                     Element_Set  :  DOM_Sort(Element_Set);
             } else {
-                Element_Set = _Self_.parseHTML(Element_Set);
-                if (
-                    (Element_Set.length == 1)  &&
-                    (Element_Set[0].nodeType == 1)  &&
-                    $.isPlainObject( iContext )
-                )
+                Element_Set = $.map(_Self_.parseHTML(Element_Set),  function () {
+                    if (arguments[0].nodeType == 1)  return arguments[0];
+                });
+                if ((Element_Set.length == 1)  &&  $.isPlainObject( iContext ))
                     for (var iKey in iContext) {
                         if (typeof this[iKey] == 'function')
                             (new _Self_( Element_Set[0] ))[iKey]( iContext[iKey] );
@@ -4084,7 +4082,7 @@
             var $_Script = $( iFragment.children )
                     .filter('script').not('[src]').remove();
 
-            for (var i = 0;  i < $_Script.length;  i++)
+            for (var i = 0;  $_Script[i];  i++)
                 $.globalEval( $_Script[i].text );
 
             if (typeof iCallback == 'function')
@@ -4103,6 +4101,82 @@
 
     if (! (($.browser.msie < 10)  ||  $.browser.ios))
         return;
+
+/* ---------- Placeholder ---------- */
+
+    var _Value_ = {
+            INPUT:       Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype, 'value'
+            ),
+            TEXTAREA:    Object.getOwnPropertyDescriptor(
+                HTMLTextAreaElement.prototype, 'value'
+            )
+        };
+    function getValue() {
+        return _Value_[this.tagName].get.call(this);
+    }
+
+    function PH_Blur() {
+        if (getValue.call( this ))  return;
+
+        this.value = this.placeholder;
+        this.style.color = 'gray';
+    }
+
+    function PH_Focus() {
+        if (this.placeholder != getValue.call(this))  return;
+
+        this.value = '';
+        this.style.color = '';
+    }
+
+    var iPlaceHolder = {
+            get:    function () {
+                return this.getAttribute('placeholder');
+            },
+            set:    function () {
+                this.setAttribute('placeholder', arguments[0]);
+
+                PH_Blur.call(this);
+
+                $(this).off('focus', PH_Focus).off('blur', PH_Blur)
+                    .focus(PH_Focus).blur(PH_Blur);
+            }
+        };
+    Object.defineProperty(
+        HTMLInputElement.prototype, 'placeholder', iPlaceHolder
+    );
+    Object.defineProperty(
+        HTMLTextAreaElement.prototype, 'placeholder', iPlaceHolder
+    );
+
+    $(DOM).ready(function () {
+        $('input[placeholder], textarea[placeholder]')
+            .prop('placeholder',  function () {
+                return this.placeholder;
+            });
+    });
+
+/* ---------- Field Value ---------- */
+
+    var Value_Patch = {
+            get:    function () {
+                var iValue = getValue.call(this);
+
+                return (
+                    (iValue == this.placeholder)  &&  (this.style.color == 'gray')
+                ) ?
+                    '' : iValue;
+            }/*,
+            set:    function () {
+                _Value_.set.call(this, arguments[0]);
+
+                if (this.style.color == 'gray')  this.style.color = '';
+            }*/
+        };
+    Object.defineProperty(HTMLInputElement.prototype, 'value', Value_Patch);
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'value', Value_Patch);
+
 
 /* ---------- Form Element API ---------- */
 
@@ -4140,8 +4214,15 @@
         var $_Input = $('*[name]:input', this);
 
         for (var i = 0;  i < $_Input.length;  i++)
-            if (! $_Input[i].checkValidity())
+            if (! $_Input[i].checkValidity()) {
+                $_Input[i].style.borderColor = 'red';
+
+                $.wait(1,  function () {
+                    $_Input[i].style.borderColor = '';
+                });
                 return false;
+            }
+
         return true;
     };
 
@@ -4382,7 +4463,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-07-14)  Beta
+//      [Version]    v2.0  (2016-07-18)  Beta
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
