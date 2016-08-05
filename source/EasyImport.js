@@ -2,7 +2,7 @@
 //                >>>  EasyImport.js  <<<
 //
 //
-//      [Version]    v1.3  (2016-06-06)  Alpha
+//      [Version]    v1.3  (2016-08-05)  Alpha
 //
 //      [Usage]      A Asynchronous & Responsive Loader
 //                   for Resource File in Web Browser.
@@ -66,10 +66,11 @@ define('EasyImport',  ['iQuery'],  function ($) {
         var iRequire = [ ];
 
         for (var i = 0, _Module_;  this.parents[i];  i++)
-            switch ( this.parents[i] ) {
+            switch ($.fileName( this.parents[i] )) {
                 case 'require':    iRequire[i] = InnerRequire;    break;
                 case 'exports':    iRequire[i] = this.exports;    break;
-                case 'iQuery':     iRequire[i] = $;               break;
+                case 'iQuery':     ;
+                case 'jQuery+':    iRequire[i] = $;               break;
                 default:           {
                     _Module_ = AMD_Module[ this.parents[i] ];
 
