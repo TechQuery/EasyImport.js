@@ -2773,12 +2773,11 @@
 
 /* ---------- ParentNode Children ---------- */
 
-    function HTMLCollection() {
-        var iChildren = arguments[0].childNodes;
+    function HTMLCollection(DOM_Array) {
 
-        for (var i = 0, j = 0;  iChildren[i];  i++)
-            if (iChildren[i].nodeType == 1){
-                this[j] = iChildren[i];
+        for (var i = 0, j = 0;  DOM_Array[i];  i++)
+            if (DOM_Array[i].nodeType == 1){
+                this[j] = DOM_Array[i];
 
                 if (this[j++].name)  this[this[j - 1].name] = this[j - 1];
             }
@@ -2793,7 +2792,7 @@
 
     var Children_Define = {
             get:    function () {
-                return  new HTMLCollection(this);
+                return  new HTMLCollection( this.childNodes );
             }
         };
 
@@ -2808,6 +2807,18 @@
         Object.defineProperty(DOM_Proto, 'children', Children_Define);
 
 
+/* ---------- Selected Options ---------- */
+
+    if ($.browser.msie < 12)
+        Object.defineProperty(HTMLSelectElement.prototype, 'selectedOptions', {
+            get:    function () {
+                return  new HTMLCollection(
+                    $.map(this.options,  function (iOption) {
+                        return  iOption.selected ? iOption : null;
+                    })
+                );
+            }
+        });
 /* ---------- Element CSS Selector Match ---------- */
 
     var DOM_Proto = Element.prototype;
@@ -4170,7 +4181,8 @@
                 return this.getAttribute('placeholder');
             },
             set:    function () {
-                this.setAttribute('placeholder', arguments[0]);
+                if ($.browser.modern)
+                    this.setAttribute('placeholder', arguments[0]);
 
                 PH_Blur.call(this);
 
@@ -4381,11 +4393,46 @@
 
 /* ---------- AJAX for IE 10- ---------- */
 
-    $.ajaxTransport(function (iOption) {
+    function DHR_Transport(iOption) {
         var iXHR;
 
-        if (($.browser.msie < 10)  &&  iOption.crossDomain)
-            return {
+        return {
+            send:     function (iHeader, iComplete) {
+                if (iOption.dataType == 'jsonp')
+                    iOption.url += (iOption.url.split('?')[1] ? '&' : '?')  +
+                        iOption.jsonp + '=?';
+
+                iXHR = new BOM.DOMHttpRequest();
+                iXHR.open(iOption.type, iOption.url);
+                iXHR.onload = function () {
+                    var iResponse = {text:  iXHR.responseText};
+                    iResponse[ iXHR.responseType ] = iXHR.response;
+
+                    iComplete(iXHR.status, iXHR.statusText, iResponse);
+                };
+                iXHR.send(iOption.data);
+            },
+            abort:    function () {
+                iXHR.abort();
+            }
+        };
+    }
+
+    //  JSONP for iQuery
+    $.ajaxTransport('jsonp', DHR_Transport);
+
+    if ($.browser.msie < 10)
+        $.ajaxTransport('+*',  function (iOption) {
+            var iXHR,  iForm = iOption.data.ownerNode;
+
+            if (
+                (iOption.data instanceof BOM.FormData)  &&
+                $(iForm).is('form')  &&
+                $('input[type="file"]', iForm)[0]
+            )
+                return DHR_Transport(iOption);
+
+            return  iOption.crossDomain && {
                 send:     function (iHeader, iComplete) {
                     iXHR = new BOM.XDomainRequest();
 
@@ -4411,48 +4458,7 @@
                     iXHR = null;
                 }
             };
-    });
-
-    function DHR_Transport(iOption) {
-        var iXHR,  iForm = iOption.data.ownerNode;
-
-        switch (true) {
-            case (
-                (iOption.data instanceof BOM.FormData)  &&
-                $(iForm).is('form')  &&
-                $('input[type="file"]', iForm)[0]
-            ):
-                break;
-            case ($.fn.iquery  &&  (iOption.dataType == 'jsonp')):
-                break;
-            default:    return;
-        }
-
-        return {
-            send:     function (iHeader, iComplete) {
-                if (iOption.dataType == 'jsonp')
-                    iOption.url += (iOption.url.split('?')[1] ? '&' : '?')  +
-                        iOption.jsonp + '=?';
-
-                iXHR = new BOM.DOMHttpRequest();
-                iXHR.open(iOption.type, iOption.url);
-                iXHR.onload = function () {
-                    var iResponse = {text:  iXHR.responseText};
-                    iResponse[ iXHR.responseType ] = iXHR.response;
-
-                    iComplete(iXHR.status, iXHR.statusText, iResponse);
-                };
-                iXHR.send(iOption.data);
-            },
-            abort:    function () {
-                iXHR.abort();
-            }
-        };
-    }
-
-    $.ajaxTransport(DHR_Transport);
-
-    $.ajaxTransport('jsonp', DHR_Transport);
+        });
 
 /* ---------- Form Element AJAX Submit ---------- */
 
@@ -4498,7 +4504,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-08-05)  Stable
+//      [Version]    v2.0  (2016-08-30)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -4519,6 +4525,8 @@
 
 
 });
+
+define("iQuery", function(){});
 
 //
 //                >>>  EasyImport.js  <<<
@@ -4587,7 +4595,7 @@
         var iRequire = [ ];
 
         for (var i = 0, _Module_;  this.parents[i];  i++)
-            switch ( this.parents[i] ) {
+            switch ($.fileName( this.parents[i] )) {
                 case 'require':    iRequire[i] = InnerRequire;    break;
                 case 'exports':    iRequire[i] = this.exports;    break;
                 case 'iQuery':     ;
