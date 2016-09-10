@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Easyimport.js by TechQuery</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-dark.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/TechQuery/EasyImport.js">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/TechQuery/EasyImport.js/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/TechQuery/EasyImport.js/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>Easyimport.js</h1>
+          <p>JavaScript WFE Loader</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/TechQuery">TechQuery</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
+
+        <h1>
+<a id="easyimportjs" class="anchor" href="#easyimportjs" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>EasyImport.js</h1>
+
+<h2>
+<a id="项目概览" class="anchor" href="#%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%A7%88" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【项目概览】</h2>
+
+<p><strong>EasyImport.js</strong> 能给 传统网页、<strong>单页应用</strong> 提供有力的<strong>脚本异步加载、响应式适配、资源延迟加载</strong>支持，并且拥有这一切的过程也很平滑、自然 ——</p>
+
+<ol>
+<li>脚本加载<strong>顺序即依赖</strong> —— 沿用 <strong>HTML 编程思维习惯</strong>，替代 <code>&lt;script /&gt;</code> 加载页面中<strong>所有外置、内置 JavaScript 脚本</strong>
+</li>
+<li>书写形式<strong>简洁明了</strong> —— 充分运用 <strong>原生 JavaScript 语法</strong>，不自创小语法</li>
+<li>
+<strong>jQuery API</strong> 兼容 —— 基于 <a href="http://git.oschina.net/Tech_Query/iQuery">iQuery</a> 开发，并开放给<strong>应用开发者</strong>使用，逻辑不复杂的网页无需再加载 jQuery 或 Zepto</li>
+</ol>
+
+<h2>
+<a id="版本简史" class="anchor" href="#%E7%89%88%E6%9C%AC%E7%AE%80%E5%8F%B2" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【版本简史】</h2>
+
+<ul>
+<li>v1.3 Alpha  —— 2016年6月6日    首个支持 AMD 规范的版本</li>
+<li>v1.2 Stable —— 2016年1月29日
+
+<ul>
+<li>
+<strong>多媒体资源 延迟加载</strong> 支持 背景图、动态插入元素</li>
+<li>遮罩层/模态框组件 移出并贡献给 <a href="http://git.oschina.net/Tech_Query/EasyWebUI">EasyWebUI</a> 项目，并适配其开放的 <code>loading</code> 通用 <strong>加载进度事件</strong>接口</li>
+<li>新增 全局异常监控（实验特性）</li>
+</ul>
+</li>
+<li>v1.1 Stable —— 2015年8月27日
+
+<ul>
+<li>
+<strong>条件加载、异步队列 改为 更自然、灵活的 JS 对象字面量写法</strong>，大幅精简 加载队列实现逻辑</li>
+<li>支持 <code>&lt;img /&gt;</code>、<code>&lt;iframe /&gt;</code> 延迟加载</li>
+<li>同时发布的 Modern 版 删去了 iQuery、EasyImport.js 中的 IE 8 兼容代码</li>
+</ul>
+</li>
+<li>v0.9 Stable —— 2015年5月10日   基于 iQuery（jQuery API 兼容库）重写核心代码</li>
+<li>v0.6 Stable —— 2014年11月24日  首个开源版本（<a href="http://log.fyscu.com/index.php/archives/130/">发布博文</a>）</li>
+<li>v0.4 Stable —— 2014年中期      首个功能稳定版</li>
+</ul>
+
+<h2>
+<a id="核心特性" class="anchor" href="#%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【核心特性】</h2>
+
+<ol>
+<li>
+<strong>JavaScript、HTML 并行加载</strong> —— 所有脚本都可写在 <code>&lt;head /&gt;</code> 中，但却不阻塞页面其它部分的加载，<strong>代码结构清晰</strong>而又<strong>高性能</strong>
+</li>
+<li>
+<strong>内置 DOM Ready</strong> —— 每组加载的最后一段脚本（无论内置回调、外置脚本）自动在 DOM Ready 后加载/执行，既靠谱又方便（<code>$(document).ready(function () {});</code> 之类的大包装可以完全不需要了）</li>
+<li>
+<strong>JavaScript 异步加载</strong> —— 无依赖的部分外置脚本只需用 <code>[ ]</code>（数组字面量）或 <code>{ }</code>（对象字面量，v1.1+ 支持）括起来即可异步</li>
+<li>
+<strong>JavaScript 条件加载</strong> —— 外置脚本可根据 自定义条件（v1.1+ 支持）<strong>选择性加载</strong>，模块化管理 JavaScript</li>
+<li>（v1.0+）支持 <strong>大资源延迟加载</strong> —— 把 HTML 源码中 <code>&lt;img /&gt;</code>、<code>&lt;iframe /&gt;</code> 的 src 属性替换为 <code>data-src</code> 即可被加载器识别</li>
+<li>
+<strong>移动设备浏览器布局模式自适配</strong> —— 自动检测并添加合适的各种 <code>&lt;meta /&gt;</code> 标签，让网页源码以标准而通用的简洁思维编写，自然地实施<strong>响应式设计</strong>
+</li>
+<li>（v1.2+）全局异常监控（服务器端日志 需自行分析）</li>
+<li>（v1.2+）适配通用的 <strong>加载进度事件接口</strong> —— 方便适配美观的遮罩层，屏蔽丑陋的渲染过程</li>
+</ol>
+
+<h2>
+<a id="平台支持" class="anchor" href="#%E5%B9%B3%E5%8F%B0%E6%94%AF%E6%8C%81" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【平台支持】</h2>
+
+<ul>
+<li>主流内核浏览器：IE 8~11、M$ Edge、Firefox 3+、Chrome、Safari、Opera</li>
+<li>国产马甲浏览器：傲游 2+、枫树、搜狗高速 3+、360安全/极速、猎豹、QQ 等（还可能有个别奇葩 Bug，恕无力一一测试……）</li>
+<li>Android、iOS、Windows Phone、Symbian 等智能设备平台上的自带浏览器及其内核控件</li>
+</ul>
+
+<h2>
+<a id="典型案例" class="anchor" href="#%E5%85%B8%E5%9E%8B%E6%A1%88%E4%BE%8B" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【典型案例】</h2>
+
+<p><a href="http://mag.fyscu.com"><strong>《i飞扬》电子杂志 HTML 5 在线版</strong></a></p>
+
+<p>以下<strong>示例代码</strong>用 <strong>EasyImport.js v1.1+</strong> 重构自<a href="http://mag.fyscu.com/iWB/iBookView.php?name=iFY&amp;index=19">《i飞扬 19期》</a>的 HTML 源码 ——</p>
+
+<div class="highlight highlight-text-html-basic"><pre>    &lt;<span class="pl-ent">head</span>&gt;
+    ......
+<span class="pl-s1">    &lt;<span class="pl-ent">script</span> <span class="pl-e">type</span>=<span class="pl-s"><span class="pl-pds">"</span>text/javascript<span class="pl-pds">"</span></span> <span class="pl-e">src</span>=<span class="pl-s"><span class="pl-pds">"</span>./Libs/EasyImport.js<span class="pl-pds">"</span></span>&gt;&lt;/<span class="pl-ent">script</span>&gt;</span>
+<span class="pl-s1">    &lt;<span class="pl-ent">script</span>&gt;</span>
+<span class="pl-s1">    <span class="pl-k">var</span> old_PC <span class="pl-k">=</span> (<span class="pl-k">!</span> <span class="pl-smi">$</span>.<span class="pl-smi">browser</span>.<span class="pl-smi">modern</span>);</span>
+<span class="pl-s1"></span>
+<span class="pl-s1">    <span class="pl-en">ImportJS</span>([</span>
+<span class="pl-s1">        {</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>jQuery.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>     old_PC,</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>jQuery2.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>    <span class="pl-smi">$</span>.<span class="pl-smi">browser</span>.<span class="pl-smi">modern</span></span>
+<span class="pl-s1">        },</span>
+<span class="pl-s1">        {</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>Turn.HTML4.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>           old_PC,</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>Turn.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>                 <span class="pl-smi">$</span>.<span class="pl-smi">browser</span>.<span class="pl-smi">modern</span>,</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>Smooth_Scroll.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>        <span class="pl-c1">true</span>,</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>jPlayer.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>              <span class="pl-c1">true</span>,</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>jQuery.Hammer.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>        <span class="pl-c1">true</span>,</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>jQuery.PageZoomer.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>    (<span class="pl-smi">$</span>.<span class="pl-smi">browser</span>.<span class="pl-smi">modern</span>  <span class="pl-k">&amp;&amp;</span>  (<span class="pl-k">!</span> <span class="pl-smi">$</span>.<span class="pl-smi">browser</span>.<span class="pl-smi">mobile</span>)),</span>
+<span class="pl-s1">            <span class="pl-s"><span class="pl-pds">'</span>Hover_Scroll.js<span class="pl-pds">'</span></span><span class="pl-k">:</span>         (<span class="pl-k">!</span> <span class="pl-smi">$</span>.<span class="pl-smi">browser</span>.<span class="pl-smi">mobile</span>)</span>
+<span class="pl-s1">        },</span>
+<span class="pl-s1">        <span class="pl-s"><span class="pl-pds">'</span>FY_iWeBook.js<span class="pl-pds">'</span></span></span>
+<span class="pl-s1">    ], <span class="pl-k">function</span> () {</span>
+<span class="pl-s1">        <span class="pl-en">$</span>(<span class="pl-s"><span class="pl-pds">'</span>#iWB<span class="pl-pds">'</span></span>).<span class="pl-en">iWeBook</span>(<span class="pl-s"><span class="pl-pds">'</span>#jPlayer_Box<span class="pl-pds">'</span></span>);</span>
+<span class="pl-s1">    });</span>
+<span class="pl-s1"></span>
+<span class="pl-s1">    <span class="pl-k">var</span> duoshuoQuery<span class="pl-k">=</span> {short_name<span class="pl-k">:</span>  <span class="pl-s"><span class="pl-pds">'</span>fyscu<span class="pl-pds">'</span></span>};</span>
+<span class="pl-s1">    <span class="pl-en">ImportJS</span>( [<span class="pl-s"><span class="pl-pds">'</span>http://static.duoshuo.com/embed.js<span class="pl-pds">'</span></span>] );</span>
+<span class="pl-s1">    &lt;/<span class="pl-ent">script</span>&gt;</span>
+    ......
+    &lt;/<span class="pl-ent">head</span>&gt;</pre></div>
+
+<h2>
+<a id="参与开发" class="anchor" href="#%E5%8F%82%E4%B8%8E%E5%BC%80%E5%8F%91" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【参与开发】</h2>
+
+<h3>
+<a id="〇环境搭建" class="anchor" href="#%E3%80%87%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>（〇）环境搭建</h3>
+
+<ol>
+<li>安装 <strong>Git</strong>（比 SVN 更适合 <strong>开源团队</strong>）</li>
+<li>安装 <strong>Node.JS</strong> 最新 LTS 版</li>
+</ol>
+
+<h3>
+<a id="一从源码构建" class="anchor" href="#%E4%B8%80%E4%BB%8E%E6%BA%90%E7%A0%81%E6%9E%84%E5%BB%BA" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>（一）从源码构建</h3>
+
+<p>UNIX-Shell、Windows-CMD 通用脚本 ——</p>
+
+<div class="highlight highlight-source-shell"><pre>npm install -g requirejs
+npm install -g uglify-js
+
+mkdir ./EasyImport.js
+git clone https://git.oschina.net/Tech_Query/EasyImport.js.git ./EasyImport.js
+
+node r.js -o build/source.js
+uglifyjs EasyImport.js -c -m -o EasyImport.min.js --source-map=EasyImport.min.map</pre></div>
+
+<h2>
+<a id="项目缘起" class="anchor" href="#%E9%A1%B9%E7%9B%AE%E7%BC%98%E8%B5%B7" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>【项目缘起】</h2>
+
+<p>　　我在做<a href="http://mag.fyscu.com">《i飞扬》电子杂志 HTML5 在线版</a>的过程中，为了在不改变 <strong>Web 前端程序猿的编程思维习惯</strong>的前提下，保证整个 <strong>WebApp 的好用、可靠</strong>，自己开发了一个<strong>【JavaScript 文件响应式异步加载器】</strong>—— <a href="http://bbs.fyscu.com/forum.php?mod=viewthread&amp;tid=4808">EasyImport.js</a>。开始只是一段放在 HTML <code>&lt;head /&gt;</code> 中的小脚本，没觉得是个多么复杂的东西。但随着应用的深入，要想做到自己定下的目标，<strong>代码不断地迭代</strong>，期间也因为严重的 Bug 而怀疑它的价值，所以有了后来的一次较大的局部重构。</p>
+
+<p>　　但辛劳总会有收获 —— 个人更深刻地理解了 <strong>JavaScript</strong>、<strong>DOM</strong> 的一些细节，它本身也到了足够成熟的地步，作为几个<strong>线上实用项目的基础库</strong>，运行在很多人的浏览器中~</p>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+    
+  </body>
+</html>
