@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-09-10)  Stable
+//      [Version]    v2.0  (2016-09-18)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -39,6 +39,12 @@
             return iKey;
         };
 
+    Object.getPrototypeOf = Object.getPrototypeOf  ||  function (iObject) {
+        return  (iObject != null)  &&  (
+            iObject.constructor.prototype || iObject.__proto__
+        );
+    };
+
     /* ----- String Extension ----- */
 
     var _Trim_ = ''.trim;
@@ -64,10 +70,9 @@
         return  this.slice(iFrom, iTo);
     };
 
-    if (! ''.repeat)
-        String.prototype.repeat = function (Times) {
-            return  (new Array(Times + 1)).join(this);
-        };
+    String.prototype.repeat = String.prototype.repeat  ||  function (Times) {
+        return  (new Array(Times + 1)).join(this);
+    };
 
     String.prototype.toCamelCase = function () {
         var iName = this.split(arguments[0] || '-');
@@ -86,27 +91,25 @@
 
     /* ----- Array Extension ----- */
 
-    if (! [ ].indexOf)
-        Array.prototype.indexOf = function () {
-            for (var i = 0;  i < this.length;  i++)
-                if (arguments[0] === this[i])
-                    return i;
+    Array.prototype.indexOf = Array.prototype.indexOf  ||  function () {
+        for (var i = 0;  i < this.length;  i++)
+            if (arguments[0] === this[i])
+                return i;
 
-            return -1;
-        };
+        return -1;
+    };
 
-    if (! [ ].reduce)
-        Array.prototype.reduce = function () {
-            var iResult = arguments[1];
+    Array.prototype.reduce = Array.prototype.reduce  ||  function () {
+        var iResult = arguments[1];
 
-            for (var i = 1;  i < this.length;  i++) {
-                if (i == 1)  iResult = this[0];
+        for (var i = 1;  i < this.length;  i++) {
+            if (i == 1)  iResult = this[0];
 
-                iResult = arguments[0](iResult, this[i], i, this);
-            }
+            iResult = arguments[0](iResult, this[i], i, this);
+        }
 
-            return iResult;
-        };
+        return iResult;
+    };
 
     /* ----- Function Extension ----- */
 
@@ -123,8 +126,7 @@
 
     /* ----- Date Extension ----- */
 
-    if (! Date.now)
-        Date.now = function () { return  +(new Date()); };
+    Date.now = Date.now  ||  function () { return  +(new Date()); };
 
 
     /* ----- JSON Extension  v0.4 ----- */
@@ -451,7 +453,7 @@
 (function (BOM, DOM, $) {
 
     $.isPlainObject = function (iValue) {
-        return  iValue && (iValue.constructor === Object);
+        return  iValue  &&  (Object.getPrototypeOf(iValue) === Object.prototype);
     };
 
     function _Extend_(iTarget, iSource, iDeep) {
@@ -1145,7 +1147,7 @@
 
             return $.map(
                 $.makeArray(iNew.childNodes),
-                function (iDOM, _Index_) {
+                function (iDOM) {
                     return iDOM.parentNode.removeChild(iDOM);
                 }
             );
@@ -1847,7 +1849,7 @@
     function isOriginalEvent() {
         return (
             ('on' + this.type)  in
-            (this.target || DOM.documentElement).constructor.prototype
+            Object.getPrototypeOf(this.target || DOM.documentElement)
         ) || (
             $.browser.modern  &&  (this.type in Mutation_Event)
         );
@@ -2023,7 +2025,7 @@
 
             iType = 'on' + iType;
 
-            if (! (iType in this.constructor.prototype))
+            if (! (iType in Object.getPrototypeOf(this)))
                 return 'onpropertychange';
 
             return iType;
@@ -2322,11 +2324,11 @@
         return Boolean(
             (this.pageX  &&  (
                 (this.pageX < iOffset.left)  ||
-                (this.pageX  >  (iOffset.left + $_This.width()))
+                (this.pageX  >  (iOffset.left + parseFloat($_This.css('width'))))
             ))  ||
             (this.pageY  &&  (
                 (this.pageY < iOffset.top)  ||
-                (this.pageY  >  (iOffset.top + $_This.height()))
+                (this.pageY  >  (iOffset.top + parseFloat($_This.css('height'))))
             ))
         );
     };
@@ -2707,7 +2709,7 @@
         return iArgs.join('');
     }
 
-    DOM.documentElement.style.constructor.prototype.setProperty =
+    Object.getPrototypeOf( DOM.documentElement.style ).setProperty =
         function (iName, iValue) {
             var iString = '',  iWrapper,  iScale = 1,  iConvert;
 
@@ -2891,7 +2893,7 @@
     }
 
     if (! ('currentScript' in DOM))
-        Object.defineProperty(DOM.constructor.prototype, 'currentScript', {
+        Object.defineProperty(Object.getPrototypeOf(DOM), 'currentScript', {
             get:    function () {
                 var iURL = ($.browser.msie < 10)  ||  Script_URL();
 
@@ -4344,8 +4346,9 @@
 
         var $_This = this;
 
-        $[iData ? 'post' : 'get'](iURL[0],  iData,  function () {
-            var iHTML = arguments[2].responseText,  AJAX_Args = arguments;
+        $[iData ? 'post' : 'get'](iURL[0],  iData,  function (iHTML, _, iXHR) {
+
+            var iHTML = (typeof iHTML == 'string')  ?  iHTML  :  iXHR.responseText;
 
             $_This.each(function () {
                 var $_Box = $(this);
@@ -4355,7 +4358,7 @@
                 HTML_Exec.call($_Box.empty()[0],  $.makeArray( $(iHTML) ))
                     .then(function () {
                         if (typeof iCallback == 'function')
-                            iCallback.apply($_Box[0], AJAX_Args);
+                            iCallback.call($_Box[0], iHTML, _, iXHR);
                     });
             });
         },  'html');
@@ -4725,8 +4728,6 @@
 
 
 });
-
-define("iQuery", function(){});
 
 //
 //                >>>  EasyImport.js  <<<
