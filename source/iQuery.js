@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-09-29)  Stable
+//      [Version]    v2.0  (2016-10-08)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -1411,7 +1411,9 @@
 
 (function (BOM, DOM, $) {
 
-/* ---------- Enhanced :image ---------- */
+/* ---------- Enhance jQuery Pseudo ---------- */
+
+    /* ----- :image ----- */
 
     var pImage = $.extend($.makeSet('IMG', 'SVG', 'CANVAS'), {
             INPUT:    {type:  'image'},
@@ -1426,7 +1428,7 @@
         return  ($(iDOM).css('background-image') != 'none');
     };
 
-/* ---------- Enhanced :button ---------- */
+    /* ----- :button ----- */
 
     var pButton = $.makeSet('button', 'image', 'submit', 'reset');
 
@@ -1436,7 +1438,7 @@
         );
     };
 
-/* ---------- Enhanced :input ---------- */
+    /* ----- :input ----- */
 
     var pInput = $.makeSet('INPUT', 'TEXTAREA', 'BUTTON', 'SELECT');
 
@@ -1447,6 +1449,8 @@
     };
 
 /* ---------- iQuery Extended Pseudo ---------- */
+
+    /* ----- :list, :data ----- */
 
     var pList = $.makeSet('UL', 'OL', 'DL', 'TBODY', 'SELECT', 'DATALIST');
 
@@ -1459,6 +1463,8 @@
         }
     });
 
+    /* ----- :focusable ----- */
+
     var pFocusable = [
             'a[href],  map[name] area[href]',
             'label, input, textarea, button, select, option, object',
@@ -1468,6 +1474,33 @@
     $.expr[':'].focusable = function () {
         return arguments[0].matches(pFocusable);
     };
+
+    /* ----- :scrollable ----- */
+
+    var Rolling_Style = $.makeSet('auto', 'scroll');
+
+    $.expr[':'].scrollable = function () {
+        var $_This = $( arguments[0] );
+
+        var iCSS = $_This.css([
+                'width',       'height',
+                'max-width',   'max-height',
+                'overflow-x',  'overflow-y'
+            ]);
+
+        return (
+            (
+                (parseFloat(iCSS.width) || parseFloat(iCSS['max-width']))  &&
+                (iCSS['overflow-x'] in Rolling_Style)
+            )  ||
+            (
+                (parseFloat(iCSS.height) || parseFloat(iCSS['max-height']))  &&
+                (iCSS['overflow-y'] in Rolling_Style)
+            )
+        );
+    };
+
+    /* ----- :media ----- */
 
     var pMedia = $.makeSet('IFRAME', 'OBJECT', 'EMBED', 'AUDIO', 'VIDEO');
 
@@ -1542,7 +1575,8 @@
                     if (this[i].matches( $_Match ))  return true;
                 } catch (iError) { }
 
-                if (! this[i].parentNode)  $('<div />')[0].appendChild( this[i] );
+                if ((this[i].nodeType < 9)  &&  (! this[i].parentElement))
+                    $('<div />')[0].appendChild( this[i] );
 
                 if (-1  <  $.inArray(this[i], (
                     iPath  ?  $($_Match, this[i].parentNode)  :  $($_Match)
@@ -1685,17 +1719,18 @@
         };
 
         return  function (iPX) {
-            iPX = parseInt(iPX);
+            iPX = parseFloat(iPX);
 
             if ( isNaN(iPX) ) {
                 iPX = Scroll_DOM.call(this[0])[iName.scroll];
 
-                return  (iPX !== undefined) ? iPX : (
+                return  (iPX != null)  ?  iPX  :  (
                     this[0].documentElement[iName.scroll] ||
                     this[0].defaultView[iName.offset] ||
                     this[0].body[iName.scroll]
                 );
             }
+
             for (var i = 0;  i < this.length;  i++) {
                 if (this[i][iName.scroll] !== undefined) {
                     Scroll_DOM.call(this[i])[iName.scroll] = iPX;
@@ -1705,6 +1740,8 @@
                     this[i].defaultView[iName.offset] =
                     this[i].body[iName.scroll] = iPX;
             }
+
+            return this;
         };
     }
 
@@ -2396,7 +2433,7 @@
 
             $_Target.data('_Gesture_Event_', null);
 
-            var iEnd = get_Touch(iEvent);
+            var iEnd = get_Touch( iEvent.originalEvent );
 
             iEvent = {
                 target:    $_Target[0],
@@ -3155,6 +3192,190 @@
 
 (function (BOM, DOM, $) {
 
+/* ---------- CSS Prefix ---------- */
+
+    var CSS_Prefix = (function (iHash) {
+            for (var iKey in iHash)
+                if ( $.browser[iKey] )  return iHash[iKey];
+        })({
+            mozilla:    'moz',
+            webkit:     'webkit',
+            msie:       'ms'
+        });
+
+    $.cssName = function (Test_Type) {
+        return  function (iName) {
+            BOM[Test_Type]  ?  iName  :  ('-' + CSS_Prefix + '-' + iName);
+        };
+    };
+
+/* ---------- CSS Rule ---------- */
+
+    var Code_Indent = $.browser.modern ? '' : ' '.repeat(4);
+
+    function CSS_Attribute(iName, iValue) {
+        if ($.isNumeric(iValue) && iName.match($.cssPX))
+            iValue += 'px';
+
+        return  [iName, ':', Code_Indent, iValue].join('');
+    }
+
+    function CSS_Rule2Text(iRule) {
+        var Rule_Text = [''],  Rule_Block,  _Rule_Block_;
+
+        $.each(iRule,  function (iSelector) {
+            Rule_Block = iSelector + ' {';
+            _Rule_Block_ = [ ];
+
+            for (var iName in this)
+                _Rule_Block_.push(
+                    CSS_Attribute(iName, this[iName])
+                        .replace(/^(\w)/m,  Code_Indent + '$1')
+                );
+
+            Rule_Text.push(
+                [Rule_Block, _Rule_Block_.join(";\n"), '}'].join("\n")
+            );
+        });
+        Rule_Text.push('');
+
+        return Rule_Text.join("\n");
+    }
+
+    $.cssRule = function (At_Wrapper, iRule) {
+        if (typeof At_Wrapper != 'string') {
+            iRule = At_Wrapper;
+            At_Wrapper = null;
+        }
+        var CSS_Text = CSS_Rule2Text(iRule);
+
+        var $_Style = $('<style />', {
+                type:       'text/css',
+                'class':    'iQuery_CSS-Rule',
+                text:       (! At_Wrapper) ? CSS_Text : [
+                    At_Wrapper + ' {',
+                    CSS_Text.replace(/\n/m, "\n    "),
+                    '}'
+                ].join("\n")
+            }).appendTo(DOM.head);
+
+        return  ($_Style[0].sheet || $_Style[0].styleSheet);
+    };
+
+    function CSS_Rule_Search(iStyleSheet, iFilter) {
+        return  $.map(iStyleSheet || DOM.styleSheets,  function () {
+            var iRule = arguments[0].cssRules,  _Self_ = arguments.callee;
+            if (! iRule)  return;
+
+            return  $.map(iRule,  function (_Rule_) {
+                return  (_Rule_.cssRules ? _Self_ : iFilter)(_Rule_);
+            });
+        });
+    }
+
+    function CSSRuleList() {
+        $.extend(this, arguments[0]);
+        this.length = arguments[0].length;
+    }
+
+    if (typeof BOM.getMatchedCSSRules != 'function')
+        BOM.getMatchedCSSRules = function (iElement, iPseudo) {
+            if (! (iElement instanceof Element))  return null;
+
+            if (typeof iPseudo == 'string') {
+                iPseudo = (iPseudo.match(/^\s*:{1,2}([\w\-]+)\s*$/) || [ ])[1];
+
+                if (! iPseudo)  return null;
+            } else if (iPseudo)
+                iPseudo = null;
+
+            return  new CSSRuleList(CSS_Rule_Search(null,  function (iRule) {
+                var iSelector = iRule.selectorText;
+
+                if (iPseudo) {
+                    iSelector = iSelector.replace(/:{1,2}([\w\-]+)$/,  function () {
+                        return  (arguments[1] == iPseudo)  ?  ''  :  arguments[0];
+                    });
+                    if (iSelector == iRule.selectorText)  return;
+                }
+                if (iElement.matches( iSelector ))  return iRule;
+            }));
+        };
+
+    $.fn.cssRule = function (iRule, iCallback) {
+        if (! $.isPlainObject(iRule)) {
+            var $_This = this;
+
+            return  ($_This[0]  &&  CSS_Rule_Search(null,  function (_Rule_) {
+                if ((
+                    (typeof $_This.selector != 'string')  ||
+                    ($_This.selector != _Rule_.selectorText)
+                ) &&
+                    (! $_This[0].matches(_Rule_.selectorText))
+                )
+                    return;
+
+                if ((! iRule)  ||  (iRule && _Rule_.style[iRule]))
+                    return _Rule_;
+            }));
+        }
+        return  this.each(function () {
+            var _Rule_ = { },  _ID_ = this.getAttribute('id');
+
+            if (! _ID_) {
+                _ID_ = $.uuid();
+                this.setAttribute('id', _ID_);
+            }
+            for (var iSelector in iRule)
+                _Rule_['#' + _ID_ + iSelector] = iRule[iSelector];
+
+            var iSheet = $.cssRule(_Rule_);
+
+            if (typeof iCallback == 'function')  iCallback.call(this, iSheet);
+        });
+    };
+
+/* ---------- Smart zIndex ---------- */
+
+    function Get_zIndex() {
+        for (
+            var $_This = $(this),  zIndex;
+            $_This[0];
+            $_This = $($_This[0].offsetParent)
+        )
+            if ($_This.css('position') != 'static') {
+                zIndex = parseInt( $_This.css('z-index') );
+
+                if (zIndex > 0)  return zIndex;
+            }
+
+        return 0;
+    }
+
+    function Set_zIndex() {
+        var $_This = $(this),  _Index_ = 0;
+
+        $_This.siblings().addBack().filter(':visible').each(function () {
+            _Index_ = Math.max(_Index_, Get_zIndex.call(this));
+        });
+        $_This.css('z-index', ++_Index_);
+    }
+
+    $.fn.zIndex = function (new_Index) {
+        if (! $.isData(new_Index))
+            return  Get_zIndex.call(this[0]);
+        else if (new_Index == '+')
+            return  this.each(Set_zIndex);
+        else
+            return  this.css('z-index',  parseInt(new_Index) || 'auto');
+    };
+
+})(self,  self.document,  self.iQuery || iQuery);
+
+
+
+(function (BOM, DOM, $) {
+
 /* ---------- JS-Timer Animation ---------- */
 
     var FPS = 60,
@@ -3220,63 +3441,35 @@
 
 /* ---------- CSS Animation ---------- */
 
-    var CSS_Prefix = (function (iHash) {
-            for (var iKey in iHash)
-                if ( $.browser[iKey] )  return iHash[iKey];
-        })({
-            mozilla:    'moz',
-            webkit:     'webkit',
-            msie:       'ms'
-        });
-
-    function CSS_AMP() {
-        return  '-' + CSS_Prefix + '-' + arguments[0];
-    }
-
-    /* ----- Transition ----- */
-
-    var Transition_End = 'transitionend ' + CSS_Prefix + 'TransitionEnd';
-
-    function Transition_Animate(CSS_Final) {
-        var iTransition = [
-                'all',  (arguments[1] + 's'),  arguments[2]
-            ].join(' '),
-            $_This = this;
-
-        return  new Promise(function () {
-            $_This.one(Transition_End, arguments[0])
-                .css('transition', iTransition).css(
-                    CSS_AMP('transition'),  iTransition
-                )
-                .css( CSS_Final );
-        });
-    }
-
-    /* ----- KeyFrame ----- */
-
-    var Animation_End = 'animationend ' + CSS_Prefix + 'AnimationEnd';
+    var NameFixer = $.cssName('AnimationEvent');
 
     function KeyFrame_Animate(iEffect) {
+
+        if (typeof iEffect != 'string') {
+            var CSS_Final = iEffect;  iEffect = $.uuid();
+
+            var iStyle = $.cssRule(
+                    '@'  +  NameFixer('keyframes')  +  ' '  +  iEffect,
+                    {to:  CSS_Final}
+                );
+        }
         var iAnimation = { },  $_This = this;
 
-        iAnimation['animation-duration'] = iAnimation[
-            CSS_AMP('animation-duration')
-        ] = arguments[1] + 's';
+        iAnimation[ NameFixer('animation-name') ] = iEffect;
 
-        iAnimation['animation-timing-function'] = iAnimation[
-            CSS_AMP('animation-timing-function')
-        ] = arguments[2];
+        iAnimation[ NameFixer('animation-duration') ] = arguments[1] + 's';
+
+        iAnimation[ NameFixer('animation-timing-function') ] = arguments[2];
 
         return  new Promise(function (iResolve) {
-            iEffect = 'animated ' + iEffect;
 
-            $_This.one(Animation_End,  function () {
+            $_This.one('animationend WebkitAnimationEnd',  function () {
 
-                $_This.removeClass( iEffect );
+                if (iStyle)  $( iStyle.ownerNode ).remove();
 
                 iResolve();
 
-            }).css( iAnimation ).addClass( iEffect );
+            }).css( iAnimation );
         });
     }
 
@@ -3286,11 +3479,9 @@
         animate:    function (CSS_Final) {
             if (! this[0])  return this;
 
-            var iEngine;
+            var iEngine = KeyFrame_Animate;
 
-            if (typeof CSS_Final == 'string')
-                iEngine = KeyFrame_Animate;
-            else {
+            if (typeof CSS_Final != 'string') {
                 var iCSS = Object.getOwnPropertyNames( CSS_Final );
 
                 this.data('_Animate_', 1).data('_CSS_Animate_',  function () {
@@ -3301,7 +3492,7 @@
                     (($.browser.msie < 10)  ||  (! $.isEmptyObject(
                         $.intersect($.makeSet.apply($, iCSS),  Animate_Property)
                     ))) ?
-                        JSTimer_Animate  :  Transition_Animate
+                        JSTimer_Animate  :  KeyFrame_Animate
                 );
             }
 
@@ -3342,7 +3533,10 @@
             });
         },
         stop:       function () {
-            return  this.data('_Animate_', 0);
+            if ( arguments[0] )  this.data('_Animate_Queue_', null);
+
+            return  this.data('_Animate_', 0)
+                .css(NameFixer('animation-play-state'), 'paused');
         },
         promise:    function () {
             return  Promise.all($.map(this,  function (iDOM) {
@@ -3350,6 +3544,14 @@
             }));
         }
     });
+
+    $.expr[':'].animated = function () {
+        var $_This = $( arguments[0] );
+
+        return  $_This.data('_Animate_') || (
+            $_This.css( NameFixer('animation-play-state') )  ==  'running'
+        );
+    };
 
     $.fn.effect = $.fn.animate;
 
@@ -3543,8 +3745,7 @@
                 return  arguments[0] - arguments[1];
             }
         },
-        Array_Reverse = Array.prototype.reverse,
-        Rolling_Style = $.makeSet('auto', 'scroll');
+        Array_Reverse = Array.prototype.reverse;
 
     $.fn.extend({
         reduce:           function (iMethod, iKey, iCallback) {
@@ -3585,27 +3786,9 @@
             ));
         },
         scrollParents:    function () {
-            return Array_Reverse.call(this.pushStack(
-                $.map(this.eq(0).parents(),  function ($_Parent) {
-                    $_Parent = $($_Parent);
-
-                    var iCSS = $_Parent.css([
-                            'max-width', 'max-height', 'overflow-x', 'overflow-y'
-                        ]);
-
-                    if (
-                        (
-                            ($_Parent.width() || parseFloat(iCSS['max-width']))  &&
-                            (iCSS['overflow-x'] in Rolling_Style)
-                        )  ||
-                        (
-                            ($_Parent.height() || parseFloat(iCSS['max-height']))  &&
-                            (iCSS['overflow-y'] in Rolling_Style)
-                        )
-                    )
-                        return $_Parent[0];
-                })
-            ));
+            return Array_Reverse.call(this.pushStack($.merge(
+                this.eq(0).parents(':scrollable'),  [ DOM ]
+            )));
         },
         inViewport:       function () {
             for (var i = 0, _OS_, $_BOM, BOM_W, BOM_H;  this[i];  i++) {
@@ -3631,7 +3814,10 @@
             $( arguments[0] ).each(function () {
                 var $_Scroll = $_This.has(this);
 
-                var iCoord = $(this).offset(),  _Coord_ = $_Scroll.offset();
+                var _Coord_ = $_Scroll.offset() || {
+                        left: 0,  top: 0
+                    },
+                    iCoord = $(this).offset();
 
                 if (! $_Scroll.length)  return;
 
@@ -3774,171 +3960,6 @@
         }).attr('src',  ((! iHTML.match(/<.+?>/)) && iHTML.trim())  ||  'about:blank');
 
         return  $_iFrame[0].parentElement ? this : $_iFrame.appendTo(DOM.body);
-    };
-
-})(self,  self.document,  self.iQuery || iQuery);
-
-
-
-(function (BOM, DOM, $) {
-
-    var Code_Indent = $.browser.modern ? '' : ' '.repeat(4);
-
-    function CSS_Attribute(iName, iValue) {
-        if ($.isNumeric(iValue) && iName.match($.cssPX))
-            iValue += 'px';
-
-        return  [iName, ':', Code_Indent, iValue].join('');
-    }
-
-    function CSS_Rule2Text(iRule) {
-        var Rule_Text = [''],  Rule_Block,  _Rule_Block_;
-
-        $.each(iRule,  function (iSelector) {
-            Rule_Block = iSelector + ' {';
-            _Rule_Block_ = [ ];
-
-            for (var iName in this)
-                _Rule_Block_.push(
-                    CSS_Attribute(iName, this[iName])
-                        .replace(/^(\w)/m,  Code_Indent + '$1')
-                );
-
-            Rule_Text.push(
-                [Rule_Block, _Rule_Block_.join(";\n"), '}'].join("\n")
-            );
-        });
-        Rule_Text.push('');
-
-        return Rule_Text.join("\n");
-    }
-
-    $.cssRule = function (iMedia, iRule) {
-        if (typeof iMedia != 'string') {
-            iRule = iMedia;
-            iMedia = null;
-        }
-        var CSS_Text = CSS_Rule2Text(iRule);
-
-        var $_Style = $('<style />', {
-                type:       'text/css',
-                'class':    'iQuery_CSS-Rule',
-                text:       (! iMedia) ? CSS_Text : [
-                    '@media ' + iMedia + ' {',
-                    CSS_Text.replace(/\n/m, "\n    "),
-                    '}'
-                ].join("\n")
-            }).appendTo(DOM.head);
-
-        return  ($_Style[0].sheet || $_Style[0].styleSheet);
-    };
-
-    function CSS_Rule_Search(iStyleSheet, iFilter) {
-        return  $.map(iStyleSheet || DOM.styleSheets,  function () {
-            var iRule = arguments[0].cssRules,  _Self_ = arguments.callee;
-            if (! iRule)  return;
-
-            return  $.map(iRule,  function (_Rule_) {
-                return  (_Rule_.cssRules ? _Self_ : iFilter)(_Rule_);
-            });
-        });
-    }
-
-    function CSSRuleList() {
-        $.extend(this, arguments[0]);
-        this.length = arguments[0].length;
-    }
-
-    if (typeof BOM.getMatchedCSSRules != 'function')
-        BOM.getMatchedCSSRules = function (iElement, iPseudo) {
-            if (! (iElement instanceof Element))  return null;
-
-            if (typeof iPseudo == 'string') {
-                iPseudo = (iPseudo.match(/^\s*:{1,2}([\w\-]+)\s*$/) || [ ])[1];
-
-                if (! iPseudo)  return null;
-            } else if (iPseudo)
-                iPseudo = null;
-
-            return  new CSSRuleList(CSS_Rule_Search(null,  function (iRule) {
-                var iSelector = iRule.selectorText;
-
-                if (iPseudo) {
-                    iSelector = iSelector.replace(/:{1,2}([\w\-]+)$/,  function () {
-                        return  (arguments[1] == iPseudo)  ?  ''  :  arguments[0];
-                    });
-                    if (iSelector == iRule.selectorText)  return;
-                }
-                if (iElement.matches( iSelector ))  return iRule;
-            }));
-        };
-
-    $.fn.cssRule = function (iRule, iCallback) {
-        if (! $.isPlainObject(iRule)) {
-            var $_This = this;
-
-            return  ($_This[0]  &&  CSS_Rule_Search(null,  function (_Rule_) {
-                if ((
-                    (typeof $_This.selector != 'string')  ||
-                    ($_This.selector != _Rule_.selectorText)
-                ) &&
-                    (! $_This[0].matches(_Rule_.selectorText))
-                )
-                    return;
-
-                if ((! iRule)  ||  (iRule && _Rule_.style[iRule]))
-                    return _Rule_;
-            }));
-        }
-        return  this.each(function () {
-            var _Rule_ = { },  _ID_ = this.getAttribute('id');
-
-            if (! _ID_) {
-                _ID_ = $.uuid();
-                this.setAttribute('id', _ID_);
-            }
-            for (var iSelector in iRule)
-                _Rule_['#' + _ID_ + iSelector] = iRule[iSelector];
-
-            var iSheet = $.cssRule(_Rule_);
-
-            if (typeof iCallback == 'function')  iCallback.call(this, iSheet);
-        });
-    };
-
-/* ---------- Smart zIndex ---------- */
-
-    function Get_zIndex() {
-        for (
-            var $_This = $(this),  zIndex;
-            $_This[0];
-            $_This = $($_This[0].offsetParent)
-        )
-            if ($_This.css('position') != 'static') {
-                zIndex = parseInt( $_This.css('z-index') );
-
-                if (zIndex > 0)  return zIndex;
-            }
-
-        return 0;
-    }
-
-    function Set_zIndex() {
-        var $_This = $(this),  _Index_ = 0;
-
-        $_This.siblings().addBack().filter(':visible').each(function () {
-            _Index_ = Math.max(_Index_, Get_zIndex.call(this));
-        });
-        $_This.css('z-index', ++_Index_);
-    }
-
-    $.fn.zIndex = function (new_Index) {
-        if (! $.isData(new_Index))
-            return  Get_zIndex.call(this[0]);
-        else if (new_Index == '+')
-            return  this.each(Set_zIndex);
-        else
-            return  this.css('z-index',  parseInt(new_Index) || 'auto');
     };
 
 })(self,  self.document,  self.iQuery || iQuery);
