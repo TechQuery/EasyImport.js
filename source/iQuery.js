@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-10-18)  Stable
+//      [Version]    v2.0  (2016-10-28)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -836,10 +836,10 @@
                 arguments[0] || BOM.location.href
             ).match(/([^\?\#]+)(\?|\#)?/)[1].split('/').slice(0, -1).join('/');
         },
-        urlDomain:        function (iURL) {
-            return (
-                (! iURL)  ?  BOM.location  :  $('<a />', {href: iURL})[0]
-            ).origin;
+        urlDomain:        function () {
+            return ((
+                arguments[0] || BOM.location.href
+            ).match(/^(\w+:)?\/\/[^\/]+/) || '')[0];
         },
         isCrossDomain:    function () {
             var iDomain = this.urlDomain( arguments[0] );
@@ -2514,6 +2514,37 @@
         return this;
     };
 
+/* ---------- User Idle Event ---------- */
+
+    var End_Event = 'keydown mousedown scroll';
+
+    $.fn.onIdleFor = function (iSecond, iCallback) {
+        return  this.each(function () {
+            var iNO,  _Self_ = arguments.callee,  $_This = $(this);
+
+            function iCancel() {
+                BOM.clearTimeout( iNO );
+
+                $_This.off(End_Event, arguments.callee);
+
+                _Self_.call( $_This[0] );
+            }
+
+            iNO = $.wait(iSecond,  function () {
+                $_This.off(End_Event, iCancel);
+
+                iCallback.call($_This[0], $.Event({
+                    type:      'idle',
+                    target:    $_This[0]
+                }));
+
+                _Self_.call( $_This[0] );
+            });
+
+            $_This.one(End_Event, iCancel);
+        });
+    };
+
 /* ---------- Cross Page Event ---------- */
 
     function CrossPageEvent(iType, iSource) {
@@ -3063,7 +3094,7 @@
 
     var Origin_Define = {
             get:    function () {
-                return  (this.href.match(/^(\w+:)?\/\/[^\/]+/) || '')[0]  ||  '';
+                return  $.urlDomain( this.href )  ||  '';
             }
         };
     Object.defineProperty(
@@ -3936,17 +3967,17 @@
         var Data_Set = (typeof iFiller != 'function');
 
         return  this.pushStack($.map($_Value,  function (iDOM) {
-            var iKey = this.getAttribute( iAttr );
+            var iKey = iDOM.getAttribute( iAttr );
 
-            var iValue = Data_Set  ?  iFiller[iKey]  :  iFiller.apply(this, [
+            var iValue = Data_Set  ?  iFiller[iKey]  :  iFiller.apply(iDOM, [
                     iKey,  arguments[0],  $_Value
                 ]);
 
             if (iValue != null) {
-                Value_Operator.call(this, iValue);
+                Value_Operator.call(iDOM, iValue);
                 return iDOM;
             }
-        }));
+        })).change();
     };
 
 /* ---------- HTML DOM SandBox ---------- */
@@ -4523,24 +4554,26 @@
 
         var $_This = this;
 
-        $[iData ? 'post' : 'get'](
-            iURL.trim().split(/\s+/)[0],
-            iData,
-            function (iHTML, _, iXHR) {
-                iHTML = (typeof iHTML == 'string')  ?  iHTML  :  iXHR.responseText;
+        iURL = iURL.trim().split(/\s+/);
 
-                $_This.children().fadeOut(200).promise().then(function () {
+        $[iData ? 'post' : 'get'](iURL[0],  iData,  function (iHTML, _, iXHR) {
 
-                    return $_This.empty().htmlExec(iHTML);
+            iHTML = (typeof iHTML == 'string')  ?  iHTML  :  iXHR.responseText;
 
-                }).then(function () {
+            $_This.children().fadeOut(200).promise().then(function () {
 
-                    if (typeof iCallback == 'function')
-                        $_This.each($.proxy(iCallback, null, iHTML, _, iXHR));
-                });
-            },
-            'html'
-        );
+                $_This.empty();
+
+                if (! iURL[1])  return $_This.htmlExec(iHTML);
+
+                $('<div />').append( iHTML ).find( iURL[1] ).appendTo( $_This );
+
+            }).then(function () {
+
+                if (typeof iCallback == 'function')
+                    $_This.each($.proxy(iCallback, null, iHTML, _, iXHR));
+            });
+        },  'html');
 
         return this;
     };
@@ -4884,12 +4917,14 @@
 /* ---------- Form Element AJAX Submit ---------- */
 
     $.fn.ajaxSubmit = function (DataType, iCallback) {
+        if (! this[0])  return this;
+
         if (typeof DataType == 'function') {
             iCallback = DataType;
             DataType = '';
         }
 
-        this.sameParents().eq(0).on('submit',  'form',  function () {
+        function AJAX_Submit() {
             var $_Form = $(this);
 
             if ((! this.checkValidity())  ||  $_Form.data('_AJAX_Submitting_'))
@@ -4921,7 +4956,14 @@
                 if (typeof iCallback == 'function')
                     iCallback.call($_Form[0], arguments[0]);
             });
-        });
+        }
+
+        var $_This = (this.length < 2)  ?  this  :  this.sameParents().eq(0);
+
+        if ($_This[0].tagName == 'FORM')
+            $_This.submit( AJAX_Submit );
+        else
+            $_This.on('submit', 'form', AJAX_Submit);
 
         return this;
     };
