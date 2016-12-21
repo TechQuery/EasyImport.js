@@ -2,7 +2,7 @@
 //                >>>  iQuery.js  <<<
 //
 //
-//      [Version]    v2.0  (2016-12-05)  Stable
+//      [Version]    v2.0  (2016-12-15)  Stable
 //
 //      [Usage]      A Light-weight jQuery Compatible API
 //                   with IE 8+ compatibility.
@@ -46,6 +46,26 @@
         return  (iObject != null)  &&  (
             iObject.constructor.prototype || iObject.__proto__
         );
+    };
+
+    Object.create = Object.create  ||  function (iProto, iProperty) {
+        if (typeof iProto != 'object')
+            throw TypeError('Object prototype may only be an Object or null');
+
+        function iTemp() { }
+
+        iTemp.prototype = iProto;
+
+        var iObject = new iTemp();
+
+        for (var iKey in iProperty)
+            if (
+                this.prototype.hasOwnProperty.call(iProperty, iKey)  &&
+                (iProperty[iKey].value !== undefined)
+            )
+                iObject[iKey] = iProperty[iKey].value;
+
+        return iObject;
     };
 
     /* ----- String Extension ----- */
@@ -148,30 +168,6 @@
             return iValue;
         });
     };
-
-    /* ----- Console Fix  v0.1 ----- */
-
-    if (BOM.console)  return;
-
-    function _Notice_() {
-        var iString = [ ];
-
-        for (var i = 0, j = 0;  i < arguments.length;  i++)  try {
-            iString[j++] = BOM.JSON.stringify( arguments[i].valueOf() );
-        } catch (iError) {
-            iString[j++] = arguments[i];
-        }
-
-        BOM.status = iString.join(' ');
-    }
-
-    BOM.console = { };
-
-    var Console_Method = ['log', 'info', 'warn', 'error', 'dir'];
-
-    for (var i = 0;  i < Console_Method.length;  i++)
-        BOM.console[ Console_Method[i] ] = _Notice_;
-
 })(self,  self.document);
 
 
@@ -455,6 +451,21 @@
         });
 
         return  arguments.callee.apply(this, iArgs);
+    };
+
+    $.inherit = function (iSup, iSub, iStatic, iProto) {
+
+        for (var iKey in iSup)
+            if (iSup.hasOwnProperty( iKey ))  iSub[iKey] = iSup[iKey];
+
+        for (var iKey in iStatic)  iSub[iKey] = iStatic[iKey];
+
+        iSub.prototype = Object.create( iSup.prototype );
+        iSub.prototype.constructor = iSub;
+
+        for (var iKey in iProto)  iSub.prototype[iKey] = iProto[iKey];
+
+        return iSub;
     };
 
 })(self,  self.document,  self.iQuery || iQuery);
@@ -874,9 +885,9 @@
     var _Timer_ = { };
 
     $.extend({
-        _Root_:     BOM,
-        now:        Date.now,
-        every:      function (iSecond, iCallback) {
+        _Root_:      BOM,
+        now:         Date.now,
+        every:       function (iSecond, iCallback) {
             var _BOM_ = this._Root_,
                 iTimeOut = (iSecond || 0.01) * 1000,
                 iStart = this.now(),
@@ -891,19 +902,38 @@
                     _BOM_.setTimeout(arguments.callee, iTimeOut);
             }, iTimeOut);
         },
-        wait:       function (iSecond, iCallback) {
+        wait:        function (iSecond, iCallback) {
             return  this.every(iSecond, function () {
                 iCallback.apply(this, arguments);
                 return false;
             });
         },
-        start:      function (iName) {
+        start:       function (iName) {
             return  (_Timer_[iName] = this.now());
         },
-        end:        function (iName) {
+        end:         function (iName) {
             return  (this.now() - _Timer_[iName]) / 1000;
         },
-        uuid:       function () {
+        throttle:    function (iSecond, iOrigin) {
+            if (typeof iSecond != 'number') {
+                iOrigin = iSecond;
+                iSecond = 0;
+            }
+            iSecond = (iSecond || 0.25)  *  1000;
+
+            var Last_Exec = 0;
+
+            return  function () {
+                var iNow = Date.now();
+
+                if (Last_Exec + iSecond  <=  iNow) {
+                    Last_Exec = iNow;
+
+                    return  iOrigin.apply(this, arguments);
+                }
+            };
+        },
+        uuid:        function () {
             return  (arguments[0] || 'uuid')  +  '_'  +
                 (this.now() + Math.random()).toString(36)
                     .replace('.', '').toUpperCase();
@@ -1437,7 +1467,7 @@
             return  (pImage[iDOM.tagName] === true)  ||
                 (pImage[iDOM.tagName].type == iDOM.type.toLowerCase());
 
-        return  ($(iDOM).css('background-image') != 'none');
+        return  (! $(iDOM).css('background-image').indexOf('url('));
     };
 
     /* ----- :button ----- */
@@ -1529,18 +1559,8 @@
     var pMedia = $.makeSet('IFRAME', 'OBJECT', 'EMBED', 'AUDIO', 'VIDEO');
 
     $.expr[':'].media = function (iDOM) {
-        if (iDOM.tagName in pMedia)  return true;
 
-        if (! $.expr[':'].image(iDOM))  return;
-
-        var iSize = $.map($(iDOM).css([
-                'width', 'height', 'min-width', 'min-height'
-            ]), parseFloat);
-
-        return (
-            (Math.max(iSize.width, iSize['min-width']) > 240)  ||
-            (Math.max(iSize.height, iSize['min-height']) > 160)
-        );
+        return  (iDOM.tagName in pMedia)  ||  $.expr[':'].image(iDOM);
     };
 
 })(self,  self.document,  self.iQuery || iQuery);
